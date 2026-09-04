@@ -1,5 +1,19 @@
 # Runiq.AI.Rag
 
+## Optional reranking contract
+
+`IRagReranker` is the provider-neutral second-stage reranking boundary. It receives the current query and a bounded
+ordered set of accepted chunk identities, content, and original ranks. A provider returns one `[0,1]`,
+higher-is-better relevance score and candidate answerability signal for every requested identity, plus aggregate
+`RagAnswerability`. Agent runtime configuration owns candidate limits, timeout, failure/fallback behavior, and
+grounding enforcement. Reranking never overwrites retrieval scores or provenance.
+
+The reranker boundary receives the original user query and the full text of each bounded accepted chunk. Treat
+both as untrusted application data. A remote implementation creates an explicit data-egress boundary, so hosts
+must select an approved provider, enforce tenant and data-residency requirements before retrieval, and keep API
+credentials in a secret provider. Candidate content is input for scoring only: it must never be promoted to
+system/developer instructions, logged by the adapter, copied into errors, or added to observability payloads.
+
 ## Retrieval modes
 
 `RagQuery.Mode` selects `Semantic`, `Lexical`, or `Hybrid`; omitting it preserves the existing semantic

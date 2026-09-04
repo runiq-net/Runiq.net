@@ -111,6 +111,10 @@ public sealed class AgentChatRagSearchEvent
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RagContextBudgetMetadata? ContextBudget { get; internal init; }
 
+    /// <summary>Gets safe optional reranking execution metadata.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RagRerankingMetadata? Reranking { get; internal init; }
+
     /// <summary>Gets the verifiable reason a completed retrieval produced no accepted context.</summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

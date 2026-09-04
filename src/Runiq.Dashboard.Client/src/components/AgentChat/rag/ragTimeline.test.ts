@@ -145,6 +145,97 @@ test('parser safely ignores malformed RAG events', () => {
   assert.equal(parseStreamEventPayload('{"type":"rag_search_unknown","ragSearch":{}}'), null);
 });
 
+// Verifies the completed-event parser preserves valid reranking and not-answerable exclusion metadata.
+test('parser accepts reranking metadata and not-answerable context exclusions', () => {
+  const parsed = parseStreamEventPayload(JSON.stringify({
+    ...completedEvent('retrieval-1'),
+    ragSearch: {
+      ...completedEvent('retrieval-1').ragSearch,
+      acceptedCount: 0,
+      selectedResults: [],
+      noContextReason: 'NotAnswerable',
+      contextExcludedResults: [{
+        documentId: 'document-1',
+        chunkId: 'chunk-1',
+        reason: 'NotAnswerable',
+        estimatedTokens: 42,
+      }],
+      reranking: {
+        requested: true,
+        ran: true,
+        candidateCount: 1,
+        duration: '00:00:00.0150000',
+        outcome: 'Succeeded',
+        failurePolicy: 'UseOriginalOrder',
+        answerability: 'NotAnswerable',
+        candidates: [{
+          documentId: 'document-1',
+          chunkId: 'chunk-1',
+          originalRank: 1,
+          rerankRank: 1,
+          rerankRelevance: 0.82,
+          answerability: 'NotAnswerable',
+        }],
+        timedOut: false,
+      },
+    },
+  }));
+
+  assert.ok(parsed && parsed.type === 'rag_search_completed');
+  assert.equal(parsed.ragSearch.noContextReason, 'NotAnswerable');
+  assert.equal(parsed.ragSearch.contextExcludedResults?.[0]?.reason, 'NotAnswerable');
+  assert.equal(parsed.ragSearch.reranking?.candidates[0]?.rerankRelevance, 0.82);
+});
+
+// Verifies malformed or unknown reranking fields are rejected instead of entering typed lifecycle state.
+test('parser rejects invalid reranking metadata', () => {
+  const completed = completedEvent('retrieval-1');
+  const invalidOutcome = {
+    ...completed,
+    ragSearch: {
+      ...completed.ragSearch,
+      reranking: {
+        requested: true,
+        ran: true,
+        candidateCount: 1,
+        duration: '00:00:00.0150000',
+        outcome: 'Unexpected',
+        failurePolicy: 'UseOriginalOrder',
+        answerability: 'Answerable',
+        candidates: [],
+        timedOut: false,
+      },
+    },
+  };
+  const invalidCandidate = {
+    ...completed,
+    ragSearch: {
+      ...completed.ragSearch,
+      reranking: {
+        requested: true,
+        ran: true,
+        candidateCount: 1,
+        duration: '00:00:00.0150000',
+        outcome: 'Succeeded',
+        failurePolicy: 'UseOriginalOrder',
+        answerability: 'Answerable',
+        candidates: [{
+          documentId: 'document-1',
+          chunkId: 'chunk-1',
+          originalRank: 1,
+          rerankRank: 1,
+          rerankRelevance: 2,
+          answerability: 'Answerable',
+        }],
+        timedOut: false,
+      },
+    },
+  };
+
+  assert.equal(parseStreamEventPayload(JSON.stringify(invalidOutcome)), null);
+  assert.equal(parseStreamEventPayload(JSON.stringify(invalidCandidate)), null);
+});
+
 function startedEvent(correlationId: string): AgentChatStreamEvent {
   return { type: 'rag_search_started', ragSearch: { ...basePayload, correlationId } };
 }

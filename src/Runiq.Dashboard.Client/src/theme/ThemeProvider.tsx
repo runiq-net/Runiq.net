@@ -1,23 +1,12 @@
 import {
-  createContext,
-  useContext,
   useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
-
-type Theme = 'dark' | 'light';
-
-type ThemeContextValue = {
-  theme: Theme;
-  toggleTheme: () => void;
-  setTheme: (theme: Theme) => void;
-};
+import { ThemeContext, type Theme, type ThemeContextValue } from './themeContext';
 
 const themeStorageKey = 'runiq-dashboard-theme';
-
-const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 type ThemeProviderProps = {
   children: ReactNode;
@@ -51,16 +40,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   return (
     <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
   );
-}
-
-export function useTheme(): ThemeContextValue {
-  const context = useContext(ThemeContext);
-
-  if (!context) {
-    throw new Error('useTheme must be used inside ThemeProvider.');
-  }
-
-  return context;
 }
 
 function getInitialTheme(): Theme {

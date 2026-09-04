@@ -29,6 +29,17 @@ internal static class AgentRagPolicyValidator
 
         var acceptance = options.Acceptance;
         var contextBudget = options.ContextBudget;
+        var reranking = options.Reranking;
+
+        if (reranking.MaximumCandidates <= 0)
+            throw new ArgumentOutOfRangeException(nameof(reranking.MaximumCandidates), reranking.MaximumCandidates,
+                "The maximum rerank candidate count must be greater than zero.");
+        if (reranking.Timeout <= TimeSpan.Zero || reranking.Timeout > TimeSpan.FromMinutes(5))
+            throw new ArgumentOutOfRangeException(nameof(reranking.Timeout), reranking.Timeout,
+                "The reranker timeout must be greater than zero and no longer than five minutes.");
+        if (!Enum.IsDefined(reranking.FailurePolicy))
+            throw new ArgumentOutOfRangeException(nameof(reranking.FailurePolicy), reranking.FailurePolicy,
+                "The reranker failure policy is not defined.");
 
         if (contextBudget.MaximumContextTokens <= 0)
         {

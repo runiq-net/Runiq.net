@@ -176,26 +176,28 @@ public sealed class DashboardFlowEndpointTests
     public void FlowServices_ShouldBuildWithScopeValidationEnabled()
     {
         // Flow runtime servislerinin scoped agent runtime ile uyumlu lifetime kullandığını doğrular.
-        var services = new ServiceCollection();
+        using var host = new HostBuilder()
+            .UseDefaultServiceProvider(options =>
+            {
+                options.ValidateOnBuild = true;
+                options.ValidateScopes = true;
+            })
+            .ConfigureWebHost(webBuilder => webBuilder
+            .UseTestServer()
+            .ConfigureServices(services =>
+            {
+                services.AddRuniqServer(options =>
+                {
+                    options.AddAgent(new WeatherAgent());
+                    options.AddAgent(new PlacesAgent());
+                    options.AddAgent(new PlannerAgent());
+                });
+                services.AddRuniqWorkflows(options => options.AddFlow(CreateFlow()));
+            })
+            .Configure(app => { }))
+            .Start();
 
-        services.AddRuniqServer(options =>
-        {
-            options.AddAgent(new WeatherAgent());
-            options.AddAgent(new PlacesAgent());
-            options.AddAgent(new PlannerAgent());
-        });
-        services.AddRuniqWorkflows(options =>
-        {
-            options.AddFlow(CreateFlow());
-        });
-
-        using var serviceProvider = services.BuildServiceProvider(new ServiceProviderOptions
-        {
-            ValidateOnBuild = true,
-            ValidateScopes = true
-        });
-
-        using var scope = serviceProvider.CreateScope();
+        using var scope = host.Services.CreateScope();
 
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<IFlowRunner>());
     }

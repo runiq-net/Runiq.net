@@ -8,5 +8,15 @@ export default defineConfig({
   build: {
     outDir: '../Runiq.AI.Core/Studio/wwwroot',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('/node_modules/react') || id.includes('/node_modules/react-dom')) return 'react';
+          if (id.includes('/node_modules/@xyflow')) return 'flow';
+          if (id.includes('/node_modules/lucide-react')) return 'icons';
+          return undefined;
+        },
+      },
+    },
   },
 });

@@ -22,6 +22,10 @@ public sealed class AgentRagOptionsTests
         Assert.Equal(4_096, options.ContextBudget.ResponseTokenReserve);
         Assert.Equal(int.MaxValue, options.ContextBudget.MaximumChunksPerSource);
         Assert.False(options.ContextBudget.PreferSourceDiversity);
+        Assert.False(options.Reranking.Enabled);
+        Assert.Equal(5, options.Reranking.MaximumCandidates);
+        Assert.Equal(TimeSpan.FromSeconds(5), options.Reranking.Timeout);
+        Assert.Equal(RagRerankerFailurePolicy.UseOriginalOrder, options.Reranking.FailurePolicy);
     }
 
     // Ensures invalid maximum context budgets fail before retrieval or provider work can begin.
@@ -52,6 +56,29 @@ public sealed class AgentRagOptionsTests
         var options = new AgentRagOptions { IndexName = "documents" };
         options.ContextBudget.MaximumChunksPerSource = 0;
 
+        Assert.Throws<ArgumentOutOfRangeException>(() => AgentRagPolicyValidator.Validate(options, requireIndex: true));
+    }
+
+    // Ensures reranking always uses a positive bounded candidate count.
+    [Fact]
+    public void Validate_ShouldRejectNonPositiveRerankCandidateLimit()
+    {
+        var options = new AgentRagOptions { IndexName = "documents" };
+        options.Reranking.MaximumCandidates = 0;
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => AgentRagPolicyValidator.Validate(options, requireIndex: true));
+    }
+
+    // Ensures reranking cannot wait indefinitely or use an undefined failure policy.
+    [Fact]
+    public void Validate_ShouldRejectInvalidRerankingRuntimePolicy()
+    {
+        var options = new AgentRagOptions { IndexName = "documents" };
+        options.Reranking.Timeout = TimeSpan.Zero;
+        Assert.Throws<ArgumentOutOfRangeException>(() => AgentRagPolicyValidator.Validate(options, requireIndex: true));
+
+        options.Reranking.Timeout = TimeSpan.FromSeconds(1);
+        options.Reranking.FailurePolicy = (RagRerankerFailurePolicy)99;
         Assert.Throws<ArgumentOutOfRangeException>(() => AgentRagPolicyValidator.Validate(options, requireIndex: true));
     }
 }

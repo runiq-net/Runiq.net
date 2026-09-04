@@ -1,4 +1,5 @@
 using Runiq.AI.Agents;
+using Runiq.AI.Agents.Configuration;
 using Runiq.AI.Agents.Tools;
 
 namespace Runiq.AI.Core.Metadata;
@@ -32,7 +33,13 @@ internal sealed class RuntimeMetadataService : IRuntimeMetadataService
                 Rag: new AgentRagMetadataDto(
                     Enabled: agent.Rag?.Enabled == true,
                     IndexName: agent.Rag?.IndexName,
-                    ExecutionMode: agent.Rag?.Enabled == true ? agent.Rag.Mode.ToString() : null),
+                    ExecutionMode: agent.Rag?.Enabled == true ? agent.Rag.Mode.ToString() : null,
+                    Reranking: new AgentRerankingMetadataDto(
+                        Enabled: agent.Rag?.Reranking.Enabled == true,
+                        MaximumCandidates: agent.Rag?.Reranking.MaximumCandidates ?? 5,
+                        Timeout: agent.Rag?.Reranking.Timeout ?? TimeSpan.FromSeconds(5),
+                        FailurePolicy: (agent.Rag?.Reranking.FailurePolicy ??
+                            RagRerankerFailurePolicy.UseOriginalOrder).ToString())),
                 Tools: agent.Tools.Select(MapAgentTool).ToList()))
             .ToList();
     }

@@ -1,8 +1,11 @@
+using System.Text.Json.Serialization;
+
 namespace Runiq.AI.Agents;
 
 /// <summary>
 /// Describes why an accepted retrieval result was excluded from the assembled model context.
 /// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum RagContextSelectionExclusionReason
 {
     /// <summary>The complete chunk did not fit in the remaining RAG context token budget.</summary>
@@ -16,4 +19,10 @@ public enum RagContextSelectionExclusionReason
 
     /// <summary>The deterministic diversity pass deferred the chunk and it could not subsequently be selected.</summary>
     SourceDiversityPreference = 3,
+
+    /// <summary>The structured reranker answerability decision did not permit grounded model context.</summary>
+    NotAnswerable = 4,
+
+    /// <summary>Fail-closed reranking prevented the accepted chunk from entering model context.</summary>
+    RerankingFailed = 5,
 }

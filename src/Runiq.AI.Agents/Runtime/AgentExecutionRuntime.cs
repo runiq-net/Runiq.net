@@ -11,6 +11,8 @@ using Runiq.AI.Core.Metadata;
 using Runiq.AI.Core.Providers;
 using Runiq.AI.Agents.Tools;
 using Runiq.AI.Rag.Abstractions.Retrieval;
+using Runiq.AI.Rag.Abstractions.Reranking;
+using Runiq.AI.Rag.Models.Reranking;
 using Runiq.AI.Rag.Models.Documents;
 using Runiq.AI.Rag.Models.Metadata;
 using Runiq.AI.Rag.Models.Queries;
@@ -36,6 +38,7 @@ public sealed class AgentExecutionRuntime
     private readonly RagObservabilityProjection observability;
     private readonly IRagIndexRegistry? ragIndexRegistry;
     private readonly IRagIngestionManager? ragIngestionManager;
+    private readonly IRagReranker? ragReranker;
 
     /// <summary>
     /// Initializes the runtime with two provider-neutral clients for compatibility with existing manual construction.
@@ -45,17 +48,20 @@ public sealed class AgentExecutionRuntime
     /// <param name="openAICompatibleClient">The client used for OpenAI-compatible and Ollama requests.</param>
     /// <param name="toolInvoker">The agent-owned tool invoker.</param>
     /// <param name="ragRetriever">Optional RAG retriever.</param>
+    /// <param name="ragReranker">Optional provider-neutral RAG reranker.</param>
     public AgentExecutionRuntime(
         IEnumerable<Agent> agents,
         IChatClient openAIResponsesClient,
         IChatClient openAICompatibleClient,
         AgentToolInvoker toolInvoker,
-        IRagRetriever? ragRetriever = null)
+        IRagRetriever? ragRetriever = null,
+        IRagReranker? ragReranker = null)
         : this(
             agents,
             new FixedChatClientResolver(openAIResponsesClient, openAICompatibleClient),
             toolInvoker,
-            ragRetriever)
+            ragRetriever,
+            ragReranker)
     {
     }
 
@@ -67,23 +73,27 @@ public sealed class AgentExecutionRuntime
     /// <param name="chatClientResolver">Resolves the shared chat client for each agent model.</param>
     /// <param name="toolInvoker">Agent tool Ã§agrilarini Ã§alistiran invoker Ã¶rnegidir.</param>
     /// <param name="ragRetriever">Agent RAG sorgularini Ã§alistiracak opsiyonel retriever servisidir.</param>
+    /// <param name="ragReranker">Optional provider-neutral RAG reranker.</param>
     public AgentExecutionRuntime(
         IEnumerable<Agent> agents,
         IChatClientResolver chatClientResolver,
         AgentToolInvoker toolInvoker,
-        IRagRetriever? ragRetriever = null)
+        IRagRetriever? ragRetriever = null,
+        IRagReranker? ragReranker = null)
     {
         this.agents = agents ?? throw new ArgumentNullException(nameof(agents));
         this.chatClientResolver = chatClientResolver ?? throw new ArgumentNullException(nameof(chatClientResolver));
         this.toolInvoker = toolInvoker ?? throw new ArgumentNullException(nameof(toolInvoker));
         this.ragRetriever = ragRetriever;
+        this.ragReranker = ragReranker;
         observability = new RagObservabilityProjection(Options.Create(new RagObservabilityOptions()), null, null,
             NullLogger<RagObservabilityProjection>.Instance);
     }
 
     internal AgentExecutionRuntime(IEnumerable<Agent> agents, IChatClientResolver chatClientResolver,
         AgentToolInvoker toolInvoker, IRagRetriever? ragRetriever, RagObservabilityProjection observability,
-        IRagIndexRegistry? ragIndexRegistry = null, IRagIngestionManager? ragIngestionManager = null)
+        IRagIndexRegistry? ragIndexRegistry = null, IRagIngestionManager? ragIngestionManager = null,
+        IRagReranker? ragReranker = null)
     {
         this.agents = agents ?? throw new ArgumentNullException(nameof(agents));
         this.chatClientResolver = chatClientResolver ?? throw new ArgumentNullException(nameof(chatClientResolver));
@@ -92,6 +102,7 @@ public sealed class AgentExecutionRuntime
         this.observability = observability ?? throw new ArgumentNullException(nameof(observability));
         this.ragIndexRegistry = ragIndexRegistry;
         this.ragIngestionManager = ragIngestionManager;
+        this.ragReranker = ragReranker;
     }
 
     /// <summary>
@@ -395,14 +406,48 @@ public sealed class AgentExecutionRuntime
             var retrievalStopwatch = Stopwatch.StartNew();
             Exception? retrievalFailure = null;
             var mandatoryPromptOverflow = false;
+            var rerankingBlocksExecution = false;
             try
             {
                 runtimeContext = await SearchRagContextAsync(
                     activeRag, indexName, query.Message, cancellationToken);
-                var assembly = AssembleRagContext(agent, query, activeRag, runtimeContext);
-                runtimeContext = assembly.Context;
+                var acceptedResults = runtimeContext.AcceptedRagResults;
+                var reranking = await RagRerankingProcessor.ExecuteAsync(
+                    query.Message, acceptedResults, activeRag.Reranking, ragReranker,
+                    cancellationToken);
+                rerankingBlocksExecution = reranking.BlocksExecution;
+                var answerabilityBlocksContext =
+                    reranking.OrderedResults.Count > 0 &&
+                    activeRag.Mode is RagExecutionMode.Grounded or RagExecutionMode.Required &&
+                    reranking.Metadata.Outcome == RagRerankingOutcome.Succeeded &&
+                    reranking.Metadata.Answerability != RagAnswerability.Answerable;
+                runtimeContext = new AgentRuntimeContext(
+                    rerankingBlocksExecution || answerabilityBlocksContext ? [] : reranking.OrderedResults,
+                    runtimeContext.RetrievedRagCandidates,
+                    runtimeContext.RejectedRagCandidates,
+                    rerankingBlocksExecution
+                        ? RagNoContextReason.RerankingFailed
+                        : answerabilityBlocksContext
+                            ? RagNoContextReason.NotAnswerable
+                            : runtimeContext.NoContextReason,
+                    runtimeContext.RetrievalStatistics,
+                    rerankingBlocksExecution ? acceptedResults : reranking.OrderedResults,
+                    contextExcludedResults: rerankingBlocksExecution || answerabilityBlocksContext
+                        ? acceptedResults.Select(result => new RagContextExcludedResult(
+                            result,
+                            rerankingBlocksExecution
+                                ? RagContextSelectionExclusionReason.RerankingFailed
+                                : RagContextSelectionExclusionReason.NotAnswerable,
+                            RagContextAssembler.EstimateTokens(result.Chunk.Content))).ToArray()
+                        : null,
+                    reranking: reranking.Metadata);
+                if (!rerankingBlocksExecution && !answerabilityBlocksContext)
+                {
+                    var assembly = AssembleRagContext(agent, query, activeRag, runtimeContext);
+                    runtimeContext = assembly.Context;
+                    mandatoryPromptOverflow = assembly.MandatoryPromptOverflow;
+                }
                 runtimeContext = runtimeContext with { RetrievalCorrelationId = correlationId };
-                mandatoryPromptOverflow = assembly.MandatoryPromptOverflow;
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -431,6 +476,18 @@ public sealed class AgentExecutionRuntime
                 yield return AgentExecutionEvent.Failed(
                     $"The mandatory prompt and response reserve exceed the configured context budget for agent '{agent.Id}'; the model was not invoked.",
                     "RagContextBudgetExceeded",
+                    CreateRagMetadata(activeRag, runtimeContext, modelInvocationSkipped: true, noContextBehaviorApplied: false));
+                yield break;
+            }
+
+            if (rerankingBlocksExecution)
+            {
+                yield return AgentExecutionEvent.FromRagSearch(CreateRagSearchCompleted(
+                    correlationId, query.ConversationId, agent, activeRag, indexName, safeQueries, runtimeContext,
+                    retrievalStopwatch.Elapsed, readinessStatus));
+                yield return AgentExecutionEvent.Failed(
+                    $"RAG reranking failed for agent '{agent.Id}'; the model was not invoked.",
+                    "RagRerankingFailed",
                     CreateRagMetadata(activeRag, runtimeContext, modelInvocationSkipped: true, noContextBehaviorApplied: false));
                 yield break;
             }
@@ -758,7 +815,8 @@ public sealed class AgentExecutionRuntime
             retrievalContext.RetrievalStatistics,
             retrievalContext.AcceptedRagResults,
             assembly.ExcludedResults,
-            assembly.Budget);
+            assembly.Budget,
+            retrievalContext.Reranking);
         return (context, assembly.MandatoryPromptOverflow);
     }
 
@@ -836,7 +894,8 @@ public sealed class AgentExecutionRuntime
                     result.Reason,
                     result.EstimatedTokens,
                     result.Result.Provenance)).ToArray(),
-            runtimeContext.ContextBudget);
+            runtimeContext.ContextBudget,
+            runtimeContext.Reranking);
     }
 
     private static AgentRagExecutionMetadata? CreateRagMetadata(
@@ -866,7 +925,8 @@ public sealed class AgentExecutionRuntime
             runtimeContext.RetrievalStatistics,
             runtimeContext.RetrievedRagContext,
             runtimeContext.ContextExcludedResults,
-            runtimeContext.ContextBudget);
+            runtimeContext.ContextBudget,
+            runtimeContext.Reranking);
     }
 
 }

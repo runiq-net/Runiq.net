@@ -9,6 +9,7 @@ public sealed class AgentRagOptions
 {
     private RagResultAcceptanceOptions acceptance = new();
     private RagContextBudgetOptions contextBudget = new();
+    private RagRerankingOptions reranking = new();
 
     /// <summary>
     /// Gets or sets a value indicating whether agent RAG retrieval is enabled.
@@ -52,6 +53,13 @@ public sealed class AgentRagOptions
     {
         get => contextBudget;
         set => contextBudget = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    /// <summary>Gets or sets the optional second-stage reranking and answerability policy.</summary>
+    public RagRerankingOptions Reranking
+    {
+        get => reranking;
+        set => reranking = value ?? throw new ArgumentNullException(nameof(value));
     }
 }
 

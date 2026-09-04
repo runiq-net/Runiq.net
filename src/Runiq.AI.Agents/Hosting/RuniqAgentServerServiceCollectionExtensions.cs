@@ -11,10 +11,10 @@ using Runiq.AI.Core.AI.Capabilities;
 using Runiq.AI.Core.Agents;
 using Runiq.AI.Core.Configuration;
 using Runiq.AI.Core.Metadata;
-using Runiq.AI.Core.Studio;
 using Runiq.AI.Core.Tools;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
+using Runiq.AI.Agents.Controllers;
 using Runiq.AI.Rag.Abstractions.Observability;
 using Runiq.AI.Rag.Configuration;
 using Runiq.AI.Rag.Abstractions.Retrieval;
@@ -71,7 +71,8 @@ public static class RuniqAgentServerServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddSingleton<IRuntimeMetadataService, RuntimeMetadataService>();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IRuniqDashboardEndpointContributor, RuniqAgentDashboardEndpointContributor>());
+        services.AddMvcCore()
+            .AddApplicationPart(typeof(AgentChatController).Assembly);
 
         services.AddHttpClient<OpenAIResponsesClient>();
         services.AddHttpClient<OpenAICompatibleClient>();
@@ -92,7 +93,8 @@ public static class RuniqAgentServerServiceCollectionExtensions
             provider.GetService<IRagRetriever>(),
             provider.GetRequiredService<RagObservabilityProjection>(),
             provider.GetService<IRagIndexRegistry>(),
-            provider.GetService<IRagIngestionManager>()));
+            provider.GetService<IRagIngestionManager>(),
+            provider.GetService<Runiq.AI.Rag.Abstractions.Reranking.IRagReranker>()));
         services.AddScoped<AgentChatApiHandler>();
 
         return services;

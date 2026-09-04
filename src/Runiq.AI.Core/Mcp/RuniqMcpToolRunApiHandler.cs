@@ -50,11 +50,19 @@ public sealed class RuniqMcpToolRunApiHandler
                 ErrorMessage: $"MCP tool '{toolName}' could not be found."));
         }
 
+        var binding = BindArguments(tool.Method, request?.Input, cancellationToken);
+        if (binding.Errors.Count > 0)
+        {
+            return Results.ValidationProblem(
+                binding.Errors,
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "One or more MCP tool inputs are invalid.");
+        }
+
         try
         {
-            var arguments = BindArguments(tool.Method, request?.Input, cancellationToken);
             var instance = tool.Method.IsStatic ? null : CreateToolInstance(tool.ToolType);
-            var invocationResult = tool.Method.Invoke(instance, arguments);
+            var invocationResult = tool.Method.Invoke(instance, binding.Arguments);
             var output = await UnwrapInvocationResultAsync(invocationResult);
 
             return Results.Ok(new RuniqMcpToolRunResponse(
@@ -79,13 +87,9 @@ public sealed class RuniqMcpToolRunApiHandler
         {
             return Results.Ok(CreateFailureResponse(exception));
         }
-        catch (JsonException exception)
-        {
-            return Results.Ok(CreateFailureResponse(exception));
-        }
     }
 
-    private object?[] BindArguments(
+    private static ArgumentBindingResult BindArguments(
         MethodInfo method,
         JsonElement? input,
         CancellationToken cancellationToken)
@@ -94,39 +98,86 @@ public sealed class RuniqMcpToolRunApiHandler
             ? input.Value
             : default;
 
-        return method
-            .GetParameters()
-            .Select(parameter => BindArgument(parameter, inputElement, cancellationToken))
-            .ToArray();
+        var parameters = method.GetParameters();
+        var arguments = new object?[parameters.Length];
+        var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        var nullabilityContext = new NullabilityInfoContext();
+
+        for (var index = 0; index < parameters.Length; index++)
+        {
+            var parameter = parameters[index];
+            if (parameter.ParameterType == typeof(CancellationToken))
+            {
+                arguments[index] = cancellationToken;
+                continue;
+            }
+
+            var propertyName = ToJsonPropertyName(parameter.Name ?? string.Empty);
+            var propertyValue = default(JsonElement);
+            var hasValue = inputElement.ValueKind == JsonValueKind.Object &&
+                inputElement.TryGetProperty(propertyName, out propertyValue);
+            var isRequired = IsRequired(parameter, nullabilityContext);
+
+            if (!hasValue)
+            {
+                if (isRequired)
+                {
+                    errors[propertyName] = ["The field is required."];
+                }
+                else
+                {
+                    arguments[index] = parameter.HasDefaultValue ? parameter.DefaultValue : null;
+                }
+
+                continue;
+            }
+
+            if (propertyValue.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            {
+                if (isRequired)
+                {
+                    errors[propertyName] = ["The field cannot be null."];
+                }
+                else
+                {
+                    arguments[index] = null;
+                }
+
+                continue;
+            }
+
+            try
+            {
+                arguments[index] = DeserializeValue(propertyValue, parameter.ParameterType);
+            }
+            catch (JsonException)
+            {
+                errors[propertyName] = ["The value has an invalid format."];
+            }
+            catch (NotSupportedException)
+            {
+                errors[propertyName] = ["The value has an unsupported format."];
+            }
+        }
+
+        return new ArgumentBindingResult(arguments, errors);
     }
 
-    private static object? BindArgument(
+    private static bool IsRequired(
         ParameterInfo parameter,
-        JsonElement input,
-        CancellationToken cancellationToken)
+        NullabilityInfoContext nullabilityContext)
     {
-        if (parameter.ParameterType == typeof(CancellationToken))
+        if (parameter.HasDefaultValue || Nullable.GetUnderlyingType(parameter.ParameterType) is not null)
         {
-            return cancellationToken;
+            return false;
         }
 
-        var parameterName = parameter.Name ?? string.Empty;
-        var propertyName = ToJsonPropertyName(parameterName);
-
-        if (input.ValueKind == JsonValueKind.Object &&
-            input.TryGetProperty(propertyName, out var propertyValue))
+        if (parameter.ParameterType.IsValueType)
         {
-            return DeserializeValue(propertyValue, parameter.ParameterType);
+            return true;
         }
 
-        if (parameter.HasDefaultValue)
-        {
-            return parameter.DefaultValue;
-        }
-
-        return parameter.ParameterType.IsValueType
-            ? Activator.CreateInstance(parameter.ParameterType)
-            : null;
+        return nullabilityContext.Create(parameter).ReadState == NullabilityState.NotNull;
     }
 
     private static object? DeserializeValue(JsonElement value, Type targetType)
@@ -209,5 +260,9 @@ public sealed class RuniqMcpToolRunApiHandler
 
         return char.ToLowerInvariant(value[0]) + value[1..];
     }
+
+    private sealed record ArgumentBindingResult(
+        object?[] Arguments,
+        Dictionary<string, string[]> Errors);
 }
 

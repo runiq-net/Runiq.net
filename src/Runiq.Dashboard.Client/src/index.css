@@ -5,10 +5,40 @@
 @layer base {
   :root {
     --runiq-control-accent: #18181b;
+    --runiq-surface-accent: rgb(245 243 255 / 0.6);
+    --runiq-border-accent: #ddd6fe;
+    --runiq-divider-accent: #ede9fe;
+    --runiq-status-success-bg: #ecfdf5;
+    --runiq-status-success-border: #a7f3d0;
+    --runiq-status-success-text: #047857;
+    --runiq-status-warning-bg: #fffbeb;
+    --runiq-status-warning-border: #fde68a;
+    --runiq-status-warning-text: #b45309;
+    --runiq-status-danger-bg: #fef2f2;
+    --runiq-status-danger-border: #fecaca;
+    --runiq-status-danger-text: #b91c1c;
+    --runiq-status-neutral-bg: #fafafa;
+    --runiq-status-neutral-border: #e4e4e7;
+    --runiq-status-neutral-text: #52525b;
   }
 
   .dark {
     --runiq-control-accent: #10b981;
+    --runiq-surface-accent: rgb(46 16 101 / 0.2);
+    --runiq-border-accent: rgb(76 29 149 / 0.6);
+    --runiq-divider-accent: #2e1065;
+    --runiq-status-success-bg: rgb(2 44 34 / 0.3);
+    --runiq-status-success-border: rgb(6 78 59 / 0.6);
+    --runiq-status-success-text: #6ee7b7;
+    --runiq-status-warning-bg: rgb(69 26 3 / 0.3);
+    --runiq-status-warning-border: rgb(120 53 15 / 0.6);
+    --runiq-status-warning-text: #fcd34d;
+    --runiq-status-danger-bg: rgb(69 10 10 / 0.3);
+    --runiq-status-danger-border: rgb(127 29 29 / 0.6);
+    --runiq-status-danger-text: #fca5a5;
+    --runiq-status-neutral-bg: #18181b;
+    --runiq-status-neutral-border: #27272a;
+    --runiq-status-neutral-text: #d4d4d8;
   }
 
   html,

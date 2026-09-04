@@ -22,8 +22,8 @@ using Runiq.AI.Rag.VectorStores.InMemory;
 using Runiq.AI.Rag.Ingestion;
 using Runiq.AI.Rag.Models.Ingestion;
 using Runiq.AI.Rag.Runtime;
-using Runiq.AI.Core.Studio;
 using Runiq.AI.Rag.Hosting;
+using Runiq.AI.Rag.Controllers;
 
 namespace Runiq.AI.Rag.DependencyInjection;
 
@@ -75,7 +75,8 @@ public static class RuniqRagServiceCollectionExtensions
 
         services.Configure<RagOptions>(_ => { });
         services.TryAddSingleton<IRagIndexRegistry>(new RagIndexRegistry(Array.Empty<RagIndexRegistration>()));
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IRuniqDashboardEndpointContributor, RuniqRagDashboardEndpointContributor>());
+        services.AddMvcCore()
+            .AddApplicationPart(typeof(RagManagementController).Assembly);
 
         return services;
     }

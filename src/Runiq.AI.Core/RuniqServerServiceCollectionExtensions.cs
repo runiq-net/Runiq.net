@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Runiq.AI.Core.Controllers;
 using Runiq.AI.Core.Mcp;
 using Runiq.AI.Core.Rag;
 
@@ -19,7 +20,8 @@ public static class RuniqServerServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-
+        services.AddMvcCore()
+            .AddApplicationPart(typeof(RuniqMcpController).Assembly);
         services.AddScoped<RuniqMcpToolRunApiHandler>();
 
 

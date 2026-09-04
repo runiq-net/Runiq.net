@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "test": "tsx --tsconfig tsconfig.app.json --test src/**/*.test.ts src/**/*.test.tsx",
+    "test": "tsx --tsconfig tsconfig.app.json --import ./src/test/testEnvironment.ts --test src/**/*.test.ts src/**/*.test.tsx",
     "lint": "eslint .",
     "preview": "vite preview"
   },

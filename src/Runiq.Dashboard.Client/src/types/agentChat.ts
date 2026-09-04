@@ -57,7 +57,51 @@ export type AgentChatNonRagStreamEventType = Exclude<
 export type AgentChatRagNoContextReason =
   | 'NoResults'
   | 'BelowRelevanceThreshold'
-  | 'CandidatesRejected';
+  | 'CandidatesRejected'
+  | 'ContextBudgetExhausted'
+  | 'NotAnswerable';
+
+export type AgentChatRagContextExclusionReason =
+  | 'TokenBudgetExceeded'
+  | 'OverlappingContent'
+  | 'SourceLimitExceeded'
+  | 'SourceDiversityPreference'
+  | 'NotAnswerable';
+
+export type AgentChatRagContextExcludedResult = {
+  documentId: string;
+  chunkId: string;
+  reason: AgentChatRagContextExclusionReason;
+  estimatedTokens: number;
+};
+
+export type AgentChatRagAnswerability = 'Unknown' | 'Answerable' | 'NotAnswerable';
+
+export type AgentChatRagRerankingOutcome = 'Disabled' | 'Succeeded' | 'Fallback' | 'Failed';
+
+export type AgentChatRagRerankerFailurePolicy = 'Fail' | 'UseOriginalOrder';
+
+export type AgentChatRagRerankedCandidate = {
+  documentId: string;
+  chunkId: string;
+  originalRank: number;
+  rerankRank: number;
+  rerankRelevance: number;
+  answerability: AgentChatRagAnswerability;
+};
+
+export type AgentChatRagRerankingMetadata = {
+  requested: boolean;
+  ran: boolean;
+  candidateCount: number;
+  duration: string;
+  outcome: AgentChatRagRerankingOutcome;
+  failurePolicy: AgentChatRagRerankerFailurePolicy;
+  answerability: AgentChatRagAnswerability;
+  candidates: AgentChatRagRerankedCandidate[];
+  timedOut: boolean;
+  failureCode?: string;
+};
 
 export type AgentChatRagFailureClassification =
   | 'InvalidRequest'
@@ -118,6 +162,8 @@ export type AgentChatRagSearchCompletedEvent = AgentChatRagSearchEventBase & {
   duration: string;
   selectedResults: AgentChatRagSelectedResult[];
   rejectedResults: AgentChatRagRejectedResult[];
+  contextExcludedResults?: AgentChatRagContextExcludedResult[];
+  reranking?: AgentChatRagRerankingMetadata;
   noContextReason?: AgentChatRagNoContextReason;
   indexReadiness?: 'Degraded';
   safeFailureSummary?: string;
