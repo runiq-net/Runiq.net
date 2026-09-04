@@ -1,9 +1,11 @@
+using System.Text.Json.Serialization;
 using Runiq.AI.Agents.Configuration;
 using Runiq.AI.Rag.Models.Reranking;
 
 namespace Runiq.AI.Agents;
 
 /// <summary>Describes the observable outcome of optional second-stage reranking.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum RagRerankingOutcome
 {
     /// <summary>Reranking was disabled.</summary>

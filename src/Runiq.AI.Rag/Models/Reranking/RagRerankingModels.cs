@@ -1,6 +1,9 @@
+using System.Text.Json.Serialization;
+
 namespace Runiq.AI.Rag.Models.Reranking;
 
 /// <summary>Describes whether the reranked evidence is sufficient to answer the current query.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum RagAnswerability
 {
     /// <summary>The reranker could not make a reliable answerability decision.</summary>

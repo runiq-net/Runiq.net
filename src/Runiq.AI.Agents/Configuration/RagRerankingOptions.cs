@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Runiq.AI.Agents.Configuration;
 
 /// <summary>Configures optional second-stage reranking and answerability evaluation.</summary>
@@ -17,6 +19,7 @@ public sealed class RagRerankingOptions
 }
 
 /// <summary>Describes how runtime execution handles a reranker failure.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum RagRerankerFailurePolicy
 {
     /// <summary>Stops RAG execution and prevents model invocation.</summary>

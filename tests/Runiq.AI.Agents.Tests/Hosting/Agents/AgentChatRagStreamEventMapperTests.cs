@@ -2,6 +2,7 @@ using System.Text.Json;
 using Runiq.AI.Agents;
 using Runiq.AI.Agents.Configuration;
 using Runiq.AI.Core.Agents;
+using Runiq.AI.Rag.Models.Reranking;
 using Runiq.AI.Rag.Models.Retrieval;
 
 namespace Runiq.AI.Core.Tests.Agents;
@@ -167,5 +168,142 @@ public sealed class AgentChatRagStreamEventMapperTests
         Assert.DoesNotContain("semanticCandidateCount", json, StringComparison.Ordinal);
         Assert.DoesNotContain("lexicalCandidateCount", json, StringComparison.Ordinal);
         Assert.DoesNotContain("fusedCandidateCount", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    // Verifies successful reranking is serialized as the complete stable JSON contract consumed by Dashboard.
+    public void FromExecutionEvent_ShouldSerializeSuccessfulRerankingMetadata()
+    {
+        using var json = SerializeCompleted(CreateCompleted(reranking: new RagRerankingMetadata(
+            requested: true,
+            ran: true,
+            candidateCount: 2,
+            duration: TimeSpan.FromMilliseconds(18),
+            outcome: RagRerankingOutcome.Succeeded,
+            failurePolicy: RagRerankerFailurePolicy.UseOriginalOrder,
+            answerability: RagAnswerability.Answerable,
+            candidates:
+            [
+                new RagRerankedCandidateMetadata("document-2", "chunk-2", 2, 1, 0.91, RagAnswerability.Answerable),
+                new RagRerankedCandidateMetadata("document-1", "chunk-1", 1, 2, 0.72, RagAnswerability.Unknown),
+            ])));
+
+        var reranking = json.RootElement.GetProperty("ragSearch").GetProperty("reranking");
+        Assert.True(reranking.GetProperty("requested").GetBoolean());
+        Assert.True(reranking.GetProperty("ran").GetBoolean());
+        Assert.Equal(2, reranking.GetProperty("candidateCount").GetInt32());
+        Assert.Equal("00:00:00.0180000", reranking.GetProperty("duration").GetString());
+        Assert.Equal("Succeeded", reranking.GetProperty("outcome").GetString());
+        Assert.Equal("UseOriginalOrder", reranking.GetProperty("failurePolicy").GetString());
+        Assert.Equal("Answerable", reranking.GetProperty("answerability").GetString());
+        Assert.False(reranking.GetProperty("timedOut").GetBoolean());
+        var firstCandidate = reranking.GetProperty("candidates")[0];
+        Assert.Equal(2, firstCandidate.GetProperty("originalRank").GetInt32());
+        Assert.Equal(1, firstCandidate.GetProperty("rerankRank").GetInt32());
+        Assert.Equal(0.91, firstCandidate.GetProperty("rerankRelevance").GetDouble());
+        Assert.Equal("Answerable", firstCandidate.GetProperty("answerability").GetString());
+    }
+
+    [Fact]
+    // Verifies an unanswerable rerank serializes both the no-context outcome and its context exclusion reason by name.
+    public void FromExecutionEvent_ShouldSerializeNotAnswerableNoContextOutcome()
+    {
+        var reranking = new RagRerankingMetadata(
+            true, true, 1, TimeSpan.FromMilliseconds(4), RagRerankingOutcome.Succeeded,
+            RagRerankerFailurePolicy.UseOriginalOrder, RagAnswerability.NotAnswerable,
+            [new RagRerankedCandidateMetadata("document-1", "chunk-1", 1, 1, 0.2, RagAnswerability.NotAnswerable)]);
+        using var json = SerializeCompleted(CreateCompleted(
+            noContextReason: RagNoContextReason.NotAnswerable,
+            contextExcludedResults:
+            [
+                new RagSearchContextExcludedResult(
+                    "document-1", "chunk-1", RagContextSelectionExclusionReason.NotAnswerable, 40),
+            ],
+            reranking: reranking));
+
+        var ragSearch = json.RootElement.GetProperty("ragSearch");
+        Assert.Equal("NotAnswerable", ragSearch.GetProperty("noContextReason").GetString());
+        Assert.Equal("NotAnswerable", ragSearch.GetProperty("contextExcludedResults")[0].GetProperty("reason").GetString());
+        Assert.Equal("NotAnswerable", ragSearch.GetProperty("reranking").GetProperty("answerability").GetString());
+    }
+
+    [Fact]
+    // Verifies a timed-out reranker serializes fallback status, timeout, and only its safe failure classification.
+    public void FromExecutionEvent_ShouldSerializeTimeoutFallback()
+    {
+        using var json = SerializeCompleted(CreateCompleted(reranking: new RagRerankingMetadata(
+            true, true, 1, TimeSpan.FromSeconds(5), RagRerankingOutcome.Fallback,
+            RagRerankerFailurePolicy.UseOriginalOrder, RagAnswerability.Unknown,
+            timedOut: true, failureCode: "Timeout")));
+
+        var reranking = json.RootElement.GetProperty("ragSearch").GetProperty("reranking");
+        Assert.Equal("Fallback", reranking.GetProperty("outcome").GetString());
+        Assert.Equal("UseOriginalOrder", reranking.GetProperty("failurePolicy").GetString());
+        Assert.True(reranking.GetProperty("timedOut").GetBoolean());
+        Assert.Equal("Timeout", reranking.GetProperty("failureCode").GetString());
+    }
+
+    [Fact]
+    // Verifies the fail policy and blocked reranking outcome remain explicit in serialized observability JSON.
+    public void FromExecutionEvent_ShouldSerializeFailPolicy()
+    {
+        using var json = SerializeCompleted(CreateCompleted(reranking: new RagRerankingMetadata(
+            true, true, 1, TimeSpan.FromMilliseconds(9), RagRerankingOutcome.Failed,
+            RagRerankerFailurePolicy.Fail, RagAnswerability.Unknown,
+            failureCode: "Unavailable")));
+
+        var reranking = json.RootElement.GetProperty("ragSearch").GetProperty("reranking");
+        Assert.Equal("Failed", reranking.GetProperty("outcome").GetString());
+        Assert.Equal("Fail", reranking.GetProperty("failurePolicy").GetString());
+        Assert.Equal("Unavailable", reranking.GetProperty("failureCode").GetString());
+    }
+
+    [Fact]
+    // Verifies reranking observability JSON cannot expose provider diagnostics or source chunk content.
+    public void FromExecutionEvent_ShouldNotSerializeRerankingProviderDetailsOrChunkContent()
+    {
+        var completed = CreateCompleted(reranking: new RagRerankingMetadata(
+            true, true, 1, TimeSpan.FromMilliseconds(3), RagRerankingOutcome.Fallback,
+            RagRerankerFailurePolicy.UseOriginalOrder, RagAnswerability.Unknown,
+            [new RagRerankedCandidateMetadata("document-1", "chunk-1", 1, 1, 0.4, RagAnswerability.Unknown)],
+            failureCode: "ProviderFailure"));
+
+        var serialized = JsonSerializer.Serialize(
+            AgentChatStreamEventMapper.FromExecutionEvent(AgentExecutionEvent.FromRagSearch(completed)),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        using var json = JsonDocument.Parse(serialized);
+        var reranking = json.RootElement.GetProperty("ragSearch").GetProperty("reranking");
+        var candidate = reranking.GetProperty("candidates")[0];
+
+        Assert.Equal(
+            ["answerability", "chunkId", "documentId", "originalRank", "rerankRank", "rerankRelevance"],
+            candidate.EnumerateObject().Select(property => property.Name).Order());
+        Assert.Equal(
+            ["answerability", "candidateCount", "candidates", "duration", "failureCode", "failurePolicy", "outcome", "ran", "requested", "timedOut"],
+            reranking.EnumerateObject().Select(property => property.Name).Order());
+        Assert.False(reranking.TryGetProperty("providerResponse", out _));
+        Assert.False(reranking.TryGetProperty("exception", out _));
+        Assert.False(reranking.TryGetProperty("stackTrace", out _));
+        Assert.False(candidate.TryGetProperty("content", out _));
+        Assert.False(candidate.TryGetProperty("metadata", out _));
+        Assert.Equal("ProviderFailure", reranking.GetProperty("failureCode").GetString());
+    }
+
+    private static RagSearchCompleted CreateCompleted(
+        RagNoContextReason? noContextReason = null,
+        IReadOnlyList<RagSearchContextExcludedResult>? contextExcludedResults = null,
+        RagRerankingMetadata? reranking = null) =>
+        new(
+            "correlation", "agent", "conversation", "documents", "question", null,
+            2, 1, 1, 0,
+            noContextReason is null ? [new RagSearchSelectedResult("document-1", "chunk-1")] : [],
+            [], 2, TimeSpan.FromMilliseconds(10), null, null, noContextReason,
+            contextExcludedResults: contextExcludedResults,
+            reranking: reranking);
+
+    private static JsonDocument SerializeCompleted(RagSearchCompleted completed)
+    {
+        var streamEvent = AgentChatStreamEventMapper.FromExecutionEvent(AgentExecutionEvent.FromRagSearch(completed));
+        return JsonDocument.Parse(JsonSerializer.Serialize(streamEvent, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
     }
 }

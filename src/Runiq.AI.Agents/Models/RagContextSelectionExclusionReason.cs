@@ -1,8 +1,11 @@
+using System.Text.Json.Serialization;
+
 namespace Runiq.AI.Agents;
 
 /// <summary>
 /// Describes why an accepted retrieval result was excluded from the assembled model context.
 /// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum RagContextSelectionExclusionReason
 {
     /// <summary>The complete chunk did not fit in the remaining RAG context token budget.</summary>
