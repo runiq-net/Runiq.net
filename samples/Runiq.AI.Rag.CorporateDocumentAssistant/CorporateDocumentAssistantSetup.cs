@@ -57,6 +57,10 @@ internal static class CorporateDocumentAssistantSetup
                     rag.Acceptance.MinimumRelevance = 0.55;
                     rag.Acceptance.CandidateCount = 12;
                     rag.Acceptance.MaximumAcceptedResults = 4;
+                    rag.Reranking.Enabled = true;
+                    rag.Reranking.MaximumCandidates = 4;
+                    rag.Reranking.Timeout = TimeSpan.FromSeconds(2);
+                    rag.Reranking.FailurePolicy = RagRerankerFailurePolicy.UseOriginalOrder;
                     rag.ContextBudget.MaximumContextTokens = 32_768;
                     rag.ContextBudget.ResponseTokenReserve = 2_048;
                     rag.ContextBudget.MaximumChunksPerSource = 2;
@@ -73,6 +77,7 @@ internal static class CorporateDocumentAssistantSetup
                 .ConfigureIngestion(ingestion => ingestion.OnStartup()));
         });
         services.AddRagEmbeddingClient(OpenAiEmbeddingModels.TextEmbedding3Small.Reference, provider => provider.GetRequiredService<OpenAiEmbeddingClient>());
+        services.AddSingleton<Runiq.AI.Rag.Abstractions.Reranking.IRagReranker, KeywordOverlapReranker>();
         services.Configure<RagOptions>(options =>
         {
             options.DefaultIndexName = IndexName;

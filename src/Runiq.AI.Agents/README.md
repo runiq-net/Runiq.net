@@ -103,6 +103,10 @@ var agent = new Agent(
         rag.Acceptance.MinimumRelevance = 0.75;
         rag.Acceptance.CandidateCount = 20;
         rag.Acceptance.MaximumAcceptedResults = 5;
+        rag.Reranking.Enabled = true;
+        rag.Reranking.MaximumCandidates = 5;
+        rag.Reranking.Timeout = TimeSpan.FromSeconds(5);
+        rag.Reranking.FailurePolicy = RagRerankerFailurePolicy.UseOriginalOrder;
         rag.ContextBudget.MaximumContextTokens = 32_768;
         rag.ContextBudget.ResponseTokenReserve = 4_096;
         rag.ContextBudget.MaximumChunksPerSource = 2;
@@ -130,6 +134,19 @@ No-context behavior is selected independently for every valid combination:
 results outside the limit remain visible as `ResultLimitExceeded` rejections. `MinimumRelevance` is an optional
 threshold in the inclusive provider-independent `[0,1]` range. The default null threshold does not manufacture
 relevance for an unsupported metric.
+
+Reranking is disabled by default. When enabled, the runtime sends at most `MaximumCandidates` accepted results to
+the registered provider-neutral `IRagReranker` after acceptance and before token-budget selection. A rerank score
+is always a separate `[0,1]` higher-is-better value; it never replaces semantic, lexical, RRF, raw, or normalized
+retrieval scores. Equal scores use original accepted rank and then ordinal document/chunk identity. The reranker
+must return every requested identity exactly once; unknown, duplicate, missing, non-finite, or out-of-range output
+invalidates the complete response.
+
+`FailurePolicy = Fail` prevents model execution. `UseOriginalOrder` preserves the exact accepted retrieval order
+for unavailable services, timeouts, exceptions, and invalid output, and exposes the fallback through structured
+metadata. Caller cancellation still propagates, while `Timeout` is classified separately. Aggregate and
+per-candidate `RagAnswerability` are observable. `Grounded` and `Required` apply their configured no-context policy
+when a successful reranker result is not `Answerable`; `Open` keeps the evidence and continues normally.
 
 Context selection is a separate stage after acceptance. The runtime calculates
 `MaximumContextTokens - instructions - conversation history - user query - response reserve - other required prompt`

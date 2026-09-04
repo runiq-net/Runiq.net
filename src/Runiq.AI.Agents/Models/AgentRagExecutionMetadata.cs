@@ -23,7 +23,8 @@ public sealed class AgentRagExecutionMetadata
         RagRetrievalStatistics retrievalStatistics,
         IReadOnlyList<RagSearchResult>? contextSelectedResults = null,
         IReadOnlyList<RagContextExcludedResult>? contextExcludedResults = null,
-        RagContextBudgetMetadata? contextBudget = null)
+        RagContextBudgetMetadata? contextBudget = null,
+        RagRerankingMetadata? reranking = null)
     {
         Mode = mode;
         HasAcceptedContext = hasAcceptedContext;
@@ -41,6 +42,7 @@ public sealed class AgentRagExecutionMetadata
         ContextSelectedResults = contextSelectedResults ?? acceptedResults;
         ContextExcludedResults = contextExcludedResults ?? [];
         ContextBudget = contextBudget;
+        Reranking = reranking;
     }
 
     /// <summary>
@@ -118,6 +120,9 @@ public sealed class AgentRagExecutionMetadata
 
     /// <summary>Gets the number of accepted results excluded from model context.</summary>
     public int ContextExcludedCount => ContextExcludedResults.Count;
+
+    /// <summary>Gets the optional reranking execution metadata.</summary>
+    public RagRerankingMetadata? Reranking { get; }
 
     /// <summary>Gets the effective retrieval mode.</summary>
     public RagRetrievalMode RetrievalMode { get; }

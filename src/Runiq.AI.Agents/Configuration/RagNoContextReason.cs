@@ -25,4 +25,7 @@ public enum RagNoContextReason
     /// Retrieval produced accepted results, but context-selection rules could not select any complete chunk.
     /// </summary>
     ContextBudgetExhausted = 3,
+
+    /// <summary>Reranking completed, but its structured aggregate answerability was not answerable.</summary>
+    NotAnswerable = 4,
 }

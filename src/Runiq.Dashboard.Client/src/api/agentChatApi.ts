@@ -214,7 +214,12 @@ function isValidRagPayload(
       Array.isArray(payload.selectedResults) &&
       payload.selectedResults.every(isValidSelectedResult) &&
       Array.isArray(payload.rejectedResults) &&
-      payload.rejectedResults.every(isValidRejectedResult);
+      payload.rejectedResults.every(isValidRejectedResult) &&
+      hasOptionalEnum(payload, 'noContextReason', ragNoContextReasons) &&
+      (payload.contextExcludedResults === undefined ||
+        (Array.isArray(payload.contextExcludedResults) &&
+          payload.contextExcludedResults.every(isValidContextExcludedResult))) &&
+      (payload.reranking === undefined || isValidRerankingMetadata(payload.reranking));
   }
 
   return true;
@@ -252,6 +257,59 @@ function isValidRejectedResult(value: unknown): boolean {
     hasOptionalFiniteNumber(value, 'normalizedRelevance');
 }
 
+const ragNoContextReasons = [
+  'NoResults',
+  'BelowRelevanceThreshold',
+  'CandidatesRejected',
+  'ContextBudgetExhausted',
+  'NotAnswerable',
+] as const;
+
+const contextExclusionReasons = [
+  'TokenBudgetExceeded',
+  'OverlappingContent',
+  'SourceLimitExceeded',
+  'SourceDiversityPreference',
+  'NotAnswerable',
+] as const;
+
+const rerankingOutcomes = ['Disabled', 'Succeeded', 'Fallback', 'Failed'] as const;
+const rerankerFailurePolicies = ['Fail', 'UseOriginalOrder'] as const;
+const ragAnswerabilities = ['Unknown', 'Answerable', 'NotAnswerable'] as const;
+
+function isValidContextExcludedResult(value: unknown): boolean {
+  return isRecord(value) &&
+    hasString(value, 'documentId') &&
+    hasString(value, 'chunkId') &&
+    hasEnum(value, 'reason', contextExclusionReasons) &&
+    hasNonNegativeInteger(value, 'estimatedTokens');
+}
+
+function isValidRerankingMetadata(value: unknown): boolean {
+  return isRecord(value) &&
+    hasBoolean(value, 'requested') &&
+    hasBoolean(value, 'ran') &&
+    hasNonNegativeInteger(value, 'candidateCount') &&
+    hasString(value, 'duration') &&
+    hasEnum(value, 'outcome', rerankingOutcomes) &&
+    hasEnum(value, 'failurePolicy', rerankerFailurePolicies) &&
+    hasEnum(value, 'answerability', ragAnswerabilities) &&
+    Array.isArray(value.candidates) &&
+    value.candidates.every(isValidRerankedCandidate) &&
+    hasBoolean(value, 'timedOut') &&
+    hasOptionalString(value, 'failureCode');
+}
+
+function isValidRerankedCandidate(value: unknown): boolean {
+  return isRecord(value) &&
+    hasString(value, 'documentId') &&
+    hasString(value, 'chunkId') &&
+    hasPositiveInteger(value, 'originalRank') &&
+    hasPositiveInteger(value, 'rerankRank') &&
+    hasNumberInRange(value, 'rerankRelevance', 0, 1) &&
+    hasEnum(value, 'answerability', ragAnswerabilities);
+}
+
 function hasOptionalFiniteNumber(value: Record<string, unknown>, key: string): boolean {
   return value[key] === undefined || hasNumber(value, key);
 }
@@ -264,7 +322,40 @@ function hasOptionalBoolean(value: Record<string, unknown>, key: string): boolea
   return value[key] === undefined || typeof value[key] === 'boolean';
 }
 
+function hasBoolean(value: Record<string, unknown>, key: string): boolean {
+  return typeof value[key] === 'boolean';
+}
+
+function hasEnum<T extends string>(
+  value: Record<string, unknown>,
+  key: string,
+  allowedValues: readonly T[],
+): boolean {
+  return typeof value[key] === 'string' && allowedValues.includes(value[key] as T);
+}
+
+function hasOptionalEnum<T extends string>(
+  value: Record<string, unknown>,
+  key: string,
+  allowedValues: readonly T[],
+): boolean {
+  return value[key] === undefined || hasEnum(value, key, allowedValues);
+}
+
+function hasNumberInRange(
+  value: Record<string, unknown>,
+  key: string,
+  minimum: number,
+  maximum: number,
+): boolean {
+  return hasNumber(value, key) && value[key] as number >= minimum && value[key] as number <= maximum;
+}
+
 function hasNonNegativeInteger(value: Record<string, unknown>, key: string): boolean {
   const candidate = value[key];
   return typeof candidate === 'number' && Number.isFinite(candidate) && Number.isInteger(candidate) && candidate >= 0;
+}
+
+function hasPositiveInteger(value: Record<string, unknown>, key: string): boolean {
+  return hasNonNegativeInteger(value, key) && (value[key] as number) > 0;
 }

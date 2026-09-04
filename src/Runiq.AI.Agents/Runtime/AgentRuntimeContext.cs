@@ -16,7 +16,8 @@ public sealed record AgentRuntimeContext(
         Runiq.AI.Rag.Models.Retrieval.RagRetrievalStatistics? retrievalStatistics = null,
         IReadOnlyList<RagSearchResult>? acceptedResultsBeforeSelection = null,
         IReadOnlyList<RagContextExcludedResult>? contextExcludedResults = null,
-        RagContextBudgetMetadata? contextBudget = null)
+        RagContextBudgetMetadata? contextBudget = null,
+        RagRerankingMetadata? reranking = null)
         : this(acceptedResults)
     {
         RetrievedRagCandidates = candidates;
@@ -26,6 +27,7 @@ public sealed record AgentRuntimeContext(
         AcceptedRagResults = acceptedResultsBeforeSelection ?? acceptedResults;
         ContextExcludedResults = contextExcludedResults ?? [];
         ContextBudget = contextBudget;
+        Reranking = reranking;
     }
 
     /// <summary>
@@ -44,6 +46,7 @@ public sealed record AgentRuntimeContext(
     internal IReadOnlyList<RagSearchResult> AcceptedRagResults { get; } = RagSearchResults ?? [];
     internal IReadOnlyList<RagContextExcludedResult> ContextExcludedResults { get; } = [];
     internal RagContextBudgetMetadata? ContextBudget { get; }
+    internal RagRerankingMetadata? Reranking { get; }
 
     internal Configuration.RagNoContextReason? NoContextReason { get; }
 

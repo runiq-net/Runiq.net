@@ -216,6 +216,7 @@ public sealed class RagSearchCompleted : RagSearchEvent
     /// <param name="fusedCandidateCount">The authoritative pre-limit fused count; zero is known and null means unavailable metadata.</param>
     /// <param name="contextExcludedResults">Accepted results excluded from the assembled model context.</param>
     /// <param name="contextBudget">Safe token counts for context assembly.</param>
+    /// <param name="reranking">Safe optional reranking execution metadata.</param>
     public RagSearchCompleted(string correlationId, string agentId, string conversationId, string indexName,
         string? originalQuery, string? effectiveQuery, int requestedCandidateCount, int actualCandidateCount,
         int acceptedCount, int rejectedCount, IReadOnlyList<RagSearchSelectedResult> selectedResults,
@@ -225,7 +226,8 @@ public sealed class RagSearchCompleted : RagSearchEvent
         RagRetrievalMode retrievalMode = RagRetrievalMode.Semantic,
         int? semanticCandidateCount = null, int? lexicalCandidateCount = null, int? fusedCandidateCount = null,
         IReadOnlyList<RagSearchContextExcludedResult>? contextExcludedResults = null,
-        RagContextBudgetMetadata? contextBudget = null)
+        RagContextBudgetMetadata? contextBudget = null,
+        RagRerankingMetadata? reranking = null)
         : base(correlationId, agentId, conversationId, indexName, originalQuery, effectiveQuery, requestedCandidateCount)
     {
         ActualCandidateCount = RequireNonNegative(actualCandidateCount, nameof(actualCandidateCount));
@@ -235,6 +237,7 @@ public sealed class RagSearchCompleted : RagSearchEvent
         RejectedResults = rejectedResults?.ToArray() ?? throw new ArgumentNullException(nameof(rejectedResults));
         ContextExcludedResults = contextExcludedResults?.ToArray() ?? [];
         ContextBudget = contextBudget;
+        Reranking = reranking;
         MaximumAcceptedResultCount = RequirePositive(maximumAcceptedResultCount, nameof(maximumAcceptedResultCount));
         Duration = duration < TimeSpan.Zero ? throw new ArgumentOutOfRangeException(nameof(duration)) : duration;
         ValidateCounts();
@@ -293,6 +296,8 @@ public sealed class RagSearchCompleted : RagSearchEvent
     public IReadOnlyList<RagSearchContextExcludedResult> ContextExcludedResults { get; }
     /// <summary>Gets safe token-budget counts for context assembly.</summary>
     public RagContextBudgetMetadata? ContextBudget { get; }
+    /// <summary>Gets safe optional reranking execution metadata.</summary>
+    public RagRerankingMetadata? Reranking { get; }
 
     private static int? RequireOptionalNonNegative(int? value, string parameterName) =>
         value is < 0 ? throw new ArgumentOutOfRangeException(parameterName, value, "The count cannot be negative.") : value;

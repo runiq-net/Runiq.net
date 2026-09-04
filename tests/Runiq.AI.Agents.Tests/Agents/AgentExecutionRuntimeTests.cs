@@ -11,10 +11,12 @@ using Runiq.AI.Core.Configuration;
 using Runiq.AI.Core.Agents;
 using Runiq.AI.Core.Models;
 using Runiq.AI.Rag.Abstractions.Retrieval;
+using Runiq.AI.Rag.Abstractions.Reranking;
 using Runiq.AI.Rag.Models.Documents;
 using Runiq.AI.Rag.Models.Metadata;
 using Runiq.AI.Rag.Models.Queries;
 using Runiq.AI.Rag.Models.Retrieval;
+using Runiq.AI.Rag.Models.Reranking;
 using Runiq.AI.Rag.Models.Search;
 using Runiq.AI.Rag.Models.VectorStores;
 using Runiq.AI.Rag.Retrieval;
@@ -1048,6 +1050,79 @@ public sealed class AgentRagExecutionRuntimeTests
         Assert.Empty(client.Requests);
     }
 
+    // Proves the production runtime reranks after acceptance and feeds the reranked order into context assembly.
+    [Fact]
+    public async Task ExecuteStreamAsync_Reranking_ReordersAssembledContextAndPublishesMetadata()
+    {
+        var agent = CreateAgent();
+        agent.Rag!.Reranking.Enabled = true;
+        var candidates = new[]
+        {
+            CreateCandidate("first", "doc-a", "first-content", 0.9, RagScoreMetrics.CosineSimilarity, true),
+            CreateCandidate("second", "doc-b", "second-content", 0.8, RagScoreMetrics.CosineSimilarity, true),
+        };
+        var reranker = new StaticReranker(new RagRerankResult(
+            [
+                new("doc-a", "first", 0.1, RagAnswerability.Answerable),
+                new("doc-b", "second", 0.9, RagAnswerability.Answerable),
+            ],
+            RagAnswerability.Answerable));
+        var client = new ScriptedChatClient();
+
+        var result = await CreateRuntime(agent, client, new StaticRetriever(candidates), reranker)
+            .ExecuteAsync(agent, "question");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["second", "first"], result.Rag!.ContextSelectedResults.Select(item => item.Chunk.Id));
+        Assert.Equal(RagRerankingOutcome.Succeeded, result.Rag.Reranking!.Outcome);
+        Assert.Contains("\"chunk\":\"second\"", client.Requests[0].Messages[2].Content, StringComparison.Ordinal);
+        Assert.True(client.Requests[0].Messages[2].Content.IndexOf("\"chunk\":\"second\"", StringComparison.Ordinal) <
+                    client.Requests[0].Messages[2].Content.IndexOf("\"chunk\":\"first\"", StringComparison.Ordinal));
+    }
+
+    // Proves required grounding treats structured unanswerability as no context and never invokes the model.
+    [Fact]
+    public async Task ExecuteStreamAsync_RequiredUnanswerable_AppliesNoContextPolicy()
+    {
+        var agent = CreateAgent(RagExecutionMode.Required, RagNoContextBehavior.ReturnNotFound);
+        agent.Rag!.Reranking.Enabled = true;
+        var candidate = CreateCandidate("first", "doc-a", "content", 0.9, RagScoreMetrics.CosineSimilarity, true);
+        var reranker = new StaticReranker(new RagRerankResult(
+            [new("doc-a", "first", 0.9, RagAnswerability.NotAnswerable)],
+            RagAnswerability.NotAnswerable));
+        var client = new ScriptedChatClient();
+
+        var result = await CreateRuntime(agent, client, new StaticRetriever([candidate]), reranker)
+            .ExecuteAsync(agent, "question");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(RagNoContextReason.NotAnswerable, result.Rag!.NoContextReason);
+        Assert.Equal(RagContextSelectionExclusionReason.NotAnswerable,
+            Assert.Single(result.Rag.ContextExcludedResults).Reason);
+        Assert.Empty(client.Requests);
+    }
+
+    // Proves the reranker fail policy publishes a distinct structured failure and blocks model execution.
+    [Fact]
+    public async Task ExecuteStreamAsync_RerankerFailureWithFailPolicy_BlocksModel()
+    {
+        var agent = CreateAgent();
+        agent.Rag!.Reranking.Enabled = true;
+        agent.Rag.Reranking.FailurePolicy = RagRerankerFailurePolicy.Fail;
+        var candidate = CreateCandidate("first", "doc-a", "content", 0.9, RagScoreMetrics.CosineSimilarity, true);
+        var reranker = new StaticReranker(new RagRerankResult([], RagAnswerability.Answerable));
+        var client = new ScriptedChatClient();
+
+        var events = await CreateRuntime(agent, client, new StaticRetriever([candidate]), reranker)
+            .ExecuteStreamAsync(agent.Id, "question").ToListAsync();
+
+        var failed = Assert.Single(events, item => item.Kind == AgentExecutionEventKind.Failed);
+        Assert.Equal("RagRerankingFailed", failed.ErrorCode);
+        Assert.Equal(RagRerankingOutcome.Failed, failed.Rag!.Reranking!.Outcome);
+        Assert.Empty(client.Requests);
+        Assert.DoesNotContain(events, item => item.RagSearch is RagSearchFailed);
+    }
+
     private static Agent CreateAgent(
         RagExecutionMode mode = RagExecutionMode.Open,
         RagNoContextBehavior noContextBehavior = RagNoContextBehavior.AnswerNormally,
@@ -1061,8 +1136,13 @@ public sealed class AgentRagExecutionRuntimeTests
                 options.Acceptance.MinimumRelevance = minimumRelevance;
             });
 
-    private static AgentExecutionRuntime CreateRuntime(Agent agent, IChatClient client, IRagRetriever? retriever = null) =>
-        new([agent], new TestChatClientResolver(client), new AgentToolInvoker(new ServiceCollection().BuildServiceProvider()), retriever);
+    private static AgentExecutionRuntime CreateRuntime(
+        Agent agent,
+        IChatClient client,
+        IRagRetriever? retriever = null,
+        IRagReranker? reranker = null) =>
+        new([agent], new TestChatClientResolver(client),
+            new AgentToolInvoker(new ServiceCollection().BuildServiceProvider()), retriever, reranker);
 
     private static AgentExecutionRuntime CreateReadinessRuntime(Agent agent, IChatClient client, IRagRetriever retriever,
         IRagIndexRegistry registry, IRagIngestionManager manager) => new([agent], new TestChatClientResolver(client),
@@ -1133,6 +1213,13 @@ public sealed class AgentRagExecutionRuntimeTests
     {
         public Task<IReadOnlyList<RagSearchResult>> RetrieveAsync(RagQuery query, CancellationToken cancellationToken = default) =>
             Task.FromResult(results);
+    }
+
+    private sealed class StaticReranker(RagRerankResult result) : IRagReranker
+    {
+        public Task<RagRerankResult> RerankAsync(
+            RagRerankRequest request,
+            CancellationToken cancellationToken = default) => Task.FromResult(result);
     }
 
     private sealed class MetadataRetriever(

@@ -92,7 +92,8 @@ public static class RuniqAgentServerServiceCollectionExtensions
             provider.GetService<IRagRetriever>(),
             provider.GetRequiredService<RagObservabilityProjection>(),
             provider.GetService<IRagIndexRegistry>(),
-            provider.GetService<IRagIngestionManager>()));
+            provider.GetService<IRagIngestionManager>(),
+            provider.GetService<Runiq.AI.Rag.Abstractions.Reranking.IRagReranker>()));
         services.AddScoped<AgentChatApiHandler>();
 
         return services;

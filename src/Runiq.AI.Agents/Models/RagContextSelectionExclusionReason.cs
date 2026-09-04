@@ -16,4 +16,7 @@ public enum RagContextSelectionExclusionReason
 
     /// <summary>The deterministic diversity pass deferred the chunk and it could not subsequently be selected.</summary>
     SourceDiversityPreference = 3,
+
+    /// <summary>The structured reranker answerability decision did not permit grounded model context.</summary>
+    NotAnswerable = 4,
 }
