@@ -19,7 +19,15 @@ public sealed record AgentMetadataDto(
 public sealed record AgentRagMetadataDto(
     bool Enabled,
     string? IndexName,
-    string? ExecutionMode);
+    string? ExecutionMode,
+    AgentRerankingMetadataDto Reranking);
+
+/// <summary>Describes the configured reranking behavior shown by the agent inspector.</summary>
+public sealed record AgentRerankingMetadataDto(
+    bool Enabled,
+    int MaximumCandidates,
+    TimeSpan Timeout,
+    string FailurePolicy);
 
 /// <summary>
 /// Studio tarafinda gosterilecek agent tool metadata bilgisini temsil eder.

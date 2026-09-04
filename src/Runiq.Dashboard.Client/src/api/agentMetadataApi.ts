@@ -17,6 +17,12 @@ export type AgentMetadata = {
     enabled: boolean;
     indexName?: string | null;
     executionMode?: string | null;
+    reranking: {
+      enabled: boolean;
+      maximumCandidates: number;
+      timeout: string;
+      failurePolicy: 'Fail' | 'UseOriginalOrder';
+    };
   };
   tools?: AgentToolMetadata[];
 };

@@ -21,6 +21,13 @@ export function RunningBehaviorTab({
         />
       </InspectorCard>
 
+      <InspectorCard title="Reranking">
+        <OverviewRow label="Enabled" value={agent.rag.reranking.enabled ? 'Yes' : 'No'} />
+        <OverviewRow label="Maximum candidates" value={String(agent.rag.reranking.maximumCandidates)} />
+        <OverviewRow label="Timeout" value={formatDuration(agent.rag.reranking.timeout)} />
+        <OverviewRow label="Failure policy" value={formatIdentifier(agent.rag.reranking.failurePolicy)} />
+      </InspectorCard>
+
       <InspectorCard title="Model Behavior">
         <OverviewRow
           label="Reasoning"
@@ -99,6 +106,18 @@ function ChatMethodRadio({
 
 function formatValue(value: string | null | undefined): string {
   return value && value.trim().length > 0 ? value : 'Default';
+}
+
+function formatDuration(value: string): string {
+  const match = /^(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?$/.exec(value);
+  if (!match) return value;
+  const seconds = Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
+  const milliseconds = Number(`0.${match[4] ?? '0'}`) * 1000;
+  return seconds === 0 ? `${milliseconds} ms` : `${seconds + milliseconds / 1000} s`;
+}
+
+function formatIdentifier(value: string): string {
+  return value.replace(/([a-z])([A-Z])/g, '$1 $2');
 }
 
 function InspectorCard({

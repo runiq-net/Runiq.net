@@ -176,6 +176,41 @@ The resulting successful-rerank behavior is:
 | `Grounded` | Use reranked context | Apply no-context policy | Apply no-context policy |
 | `Required` | Use reranked context | Apply no-context policy | Apply no-context policy |
 
+### Cohere production reranker
+
+`Runiq.AI.Agents` includes a supported cross-encoder integration for Cohere Rerank v2. Register it before
+`AddRuniqServer`; keep the credential in a secret provider or environment variable rather than source-controlled
+configuration:
+
+```csharp
+using Runiq.AI.Agents.Providers.Cohere;
+
+builder.Services.AddCohereReranker(options =>
+{
+    options.ApiKey = builder.Configuration["COHERE_API_KEY"]
+        ?? throw new InvalidOperationException("COHERE_API_KEY is required.");
+    options.Model = "rerank-v4.0-fast";
+    options.MinimumAnswerableRelevance = 0.5;
+});
+```
+
+The adapter sends the complete bounded candidate set to `POST /v2/rerank` with `top_n` equal to the candidate
+count. Cohere returns relevance but not answerability, so the adapter deterministically marks candidates at or
+above `MinimumAnswerableRelevance` as `Answerable`; aggregate answerability is `Answerable` when at least one
+candidate passes. Tune this product threshold against an evaluation set.
+
+`Rag.Reranking.Timeout` owns request cancellation. HTTP errors, rate limits, malformed/incomplete responses, and
+provider failures flow through the configured `FailurePolicy`; response bodies and credentials are not projected
+to observability. Do not add retries inside the adapter: retries can exceed the agent timeout and create additional
+billed searches. If the host adds resilience, bound attempts within the same timeout and retry only transient
+statuses.
+
+Cohere currently documents 10 Rerank requests/minute for trial keys and 1,000 requests/minute for production keys.
+Rerank is billed in search units: one query with up to 100 documents is one search unit, while long documents may
+be split and count as additional documents. Confirm current limits and prices before release:
+https://docs.cohere.com/v2/reference/rerank,
+https://docs.cohere.com/v2/docs/rate-limits, and https://cohere.com/pricing.
+
 Context selection is a separate stage after acceptance. The runtime calculates
 `MaximumContextTokens - instructions - conversation history - user query - response reserve - other required prompt`
 and selects only complete chunks whose final serialized external-context message fits. The deterministic fallback
