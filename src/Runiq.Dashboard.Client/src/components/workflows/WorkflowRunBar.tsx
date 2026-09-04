@@ -29,7 +29,7 @@ export function WorkflowRunBar({
   return (
     <form
       onSubmit={handleSubmit}
-      className="border-b border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-[#050505]"
+      className="border-b border-zinc-200 bg-[var(--runiq-page-surface)] px-4 py-3 dark:border-zinc-800"
     >
       <div className="flex flex-col gap-2 md:flex-row">
         <label className="min-w-0 flex-1">

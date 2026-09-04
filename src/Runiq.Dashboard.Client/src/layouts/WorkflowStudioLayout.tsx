@@ -14,7 +14,7 @@ export function WorkflowStudioLayout({
   children,
 }: WorkflowStudioLayoutProps) {
   return (
-    <main className="flex h-dvh w-full flex-col overflow-hidden bg-zinc-50 text-zinc-950 dark:bg-[#050505] dark:text-zinc-100">
+    <main className="flex h-dvh w-full flex-col overflow-hidden bg-[var(--runiq-page-surface)] text-zinc-950 dark:text-zinc-100">
       <WorkflowStudioTopbar
         workflowName={workflowName}
         status={status}

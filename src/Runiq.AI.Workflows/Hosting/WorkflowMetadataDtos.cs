@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Runiq.AI.Core.Workflows;
 
 /// <summary>
@@ -36,7 +38,7 @@ public sealed record WorkflowStepMetadataDto(
 /// Represents a dashboard request to execute a workflow.
 /// </summary>
 /// <param name="Input">The user input sent to the first workflow step.</param>
-public sealed record WorkflowRunRequestDto(string? Input);
+public sealed record WorkflowRunRequestDto([property: StringLength(32_768)] string? Input);
 
 /// <summary>
 /// Represents the dashboard response returned after a workflow execution.

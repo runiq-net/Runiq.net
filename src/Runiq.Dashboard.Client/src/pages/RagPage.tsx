@@ -1,116 +1,12 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { AlertTriangle, Ban, CheckCircle2, CircleDot, Database, FileStack, LoaderCircle, Play, RefreshCw, ShieldAlert, Square, XCircle } from 'lucide-react';
-import { cancelRagIngestion, getRagIndex, getRagStatus, listRagIndexes, RagApiError, startRagIngestion, type RagIndexDetail, type RagIndexListItem, type RagOperation, type RagOperationState, type RagReadiness, type RagRuntimeStatus } from '../api/ragApi';
-import { formatDuration, mergeRuntime, operationReasonLabels, operationStateLabels, pollingDelay, progressValue, readinessLabels, shouldApplyStatus, summarizeIndexes } from './ragManagement';
+import { type RagIndexDetail, type RagIndexListItem, type RagOperation, type RagOperationState, type RagReadiness, type RagRuntimeStatus } from '../api/ragApi';
+import { formatDuration, operationReasonLabels, operationStateLabels, progressValue, readinessLabels, summarizeIndexes } from './ragManagement';
+import { useRagManagement } from './useRagManagement';
 
+/** Composes RAG management presentation with index selection, commands, and a single polling lifecycle. */
 export function RagPage() {
-  const [indexes, setIndexes] = useState<RagIndexListItem[]>([]);
-  const [selectedName, setSelectedName] = useState<string | null>(null);
-  const [detail, setDetail] = useState<RagIndexDetail | null>(null);
-  const [status, setStatus] = useState<RagRuntimeStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [pageError, setPageError] = useState<string | null>(null);
-  const [commandError, setCommandError] = useState<string | null>(null);
-  const [command, setCommand] = useState<'start' | 'cancel' | null>(null);
-  const sequence = useRef(0);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    async function load() {
-      try {
-        const result = await listRagIndexes(controller.signal);
-        const requestedIndex = new URLSearchParams(window.location?.search ?? '').get('index');
-        const initialIndex = requestedIndex && result.some((item) => item.name === requestedIndex) ? requestedIndex : result[0]?.name ?? null;
-        setIndexes(result);
-        setDetailLoading(result.length > 0);
-        setSelectedName(initialIndex);
-        setPageError(null);
-      } catch (error) {
-        if (!controller.signal.aborted) setPageError(safeError(error, 'Registered RAG indexes could not be loaded.'));
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    }
-    void load();
-    return () => controller.abort();
-  }, []);
-
-  useEffect(() => {
-    if (!selectedName) return;
-    const controller = new AbortController();
-    getRagIndex(selectedName, controller.signal).then((result) => {
-      setDetail(result);
-      setStatus(result.runtime);
-    }).catch((error: unknown) => { if (!controller.signal.aborted) setCommandError(safeError(error, 'Index details could not be loaded.')); })
-      .finally(() => { if (!controller.signal.aborted) setDetailLoading(false); });
-    return () => controller.abort();
-  }, [selectedName]);
-
-  useEffect(() => {
-    if (!selectedName) return;
-    let timer: number | undefined;
-    let controller: AbortController | undefined;
-    let disposed = false;
-    const schedule = () => {
-      const delay = pollingDelay(status, document.visibilityState === 'visible');
-      if (delay === null || disposed) return;
-      timer = window.setTimeout(async () => {
-        controller = new AbortController();
-        const requestSequence = ++sequence.current;
-        setRefreshing(true);
-        try {
-          const next = await getRagStatus(selectedName, controller.signal);
-          if (!disposed && shouldApplyStatus(requestSequence, sequence.current)) {
-            setStatus(next);
-            setIndexes((current) => mergeRuntime(current, next));
-          }
-        } catch (error) {
-          if (!controller.signal.aborted && !disposed) setCommandError(safeError(error, 'Runtime status could not be refreshed.'));
-        } finally {
-          if (!disposed) { setRefreshing(false); schedule(); }
-        }
-      }, delay);
-    };
-    const visibilityChanged = () => { if (timer) window.clearTimeout(timer); controller?.abort(); schedule(); };
-    document.addEventListener('visibilitychange', visibilityChanged);
-    schedule();
-    return () => { disposed = true; if (timer) window.clearTimeout(timer); controller?.abort(); document.removeEventListener('visibilitychange', visibilityChanged); };
-  }, [selectedName, status]);
-
-  const selectIndex = (name: string) => {
-    if (name === selectedName) return;
-    sequence.current += 1;
-    setDetailLoading(true);
-    setCommandError(null);
-    setDetail(null);
-    setStatus(null);
-    setSelectedName(name);
-  };
-
-  const runCommand = async (kind: 'start' | 'cancel') => {
-    if (!selectedName) return;
-    sequence.current += 1;
-    setCommand(kind);
-    setCommandError(null);
-    try {
-      await (kind === 'start' ? startRagIngestion(selectedName) : cancelRagIngestion(selectedName));
-      const next = await getRagStatus(selectedName);
-      setStatus(next);
-      setIndexes((current) => mergeRuntime(current, next));
-    } catch (error) {
-      if (error instanceof RagApiError && error.status === 409 && error.conflict?.activeOperation) {
-        const current = status;
-        if (current) {
-          const next = { ...current, activeOperation: error.conflict.activeOperation };
-          setStatus(next);
-          setIndexes((items) => mergeRuntime(items, next));
-        }
-      }
-      setCommandError(safeError(error, `Ingestion could not be ${kind === 'start' ? 'started' : 'cancelled'}.`));
-    } finally { setCommand(null); }
-  };
+  const { indexes, selectedName, detail, status, loading, detailLoading, refreshing, pageError, commandError, command, selectIndex, runCommand } = useRagManagement();
 
   if (loading) return <LoadingState />;
   if (pageError) return <PageError message={pageError} onRetry={() => window.location.reload()} />;
@@ -203,7 +99,6 @@ function SectionTitle({ title, description, count }: { title: string; descriptio
 function LoadingState() { return <div className="space-y-4" aria-busy="true" aria-label="Loading registered RAG indexes"><div className="grid gap-3 sm:grid-cols-3">{[1, 2, 3].map((key) => <div key={key} className="h-24 animate-pulse rounded-xl bg-zinc-200 dark:bg-zinc-900" />)}</div><div className="h-72 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900/60" /></div>; }
 function EmptyState() { return <div className="rounded-xl border border-dashed border-zinc-300 bg-white p-10 text-center dark:border-zinc-700 dark:bg-zinc-950/50"><FileStack className="mx-auto size-10 text-zinc-400" aria-hidden="true" /><h2 className="mt-4 font-semibold">No RAG indexes are registered</h2><p className="mx-auto mt-2 max-w-xl text-sm text-zinc-500">Indexes cannot be created from the Dashboard. Register an index in application code with the RAG builder, then restart the application.</p></div>; }
 function PageError({ message, onRetry }: { message: string; onRetry: () => void }) { return <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950/20"><div className="flex gap-3"><ShieldAlert className="size-5 text-red-600" aria-hidden="true" /><div><h2 className="font-semibold text-red-800 dark:text-red-300">RAG management could not be loaded</h2><p className="mt-1 text-sm text-red-700 dark:text-red-300/80">{message}</p><button type="button" onClick={onRetry} className="mt-4 rounded-lg border border-red-300 px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-red-500">Try again</button></div></div></div>; }
-function safeError(error: unknown, fallback: string) { return error instanceof Error ? error.message : fallback; }
 function shortId(value: string) { return value.length > 12 ? `${value.slice(0, 8)}…${value.slice(-4)}` : value; }
 function formatDate(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? 'Unavailable' : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date); }
 function formatOperationTime(operation: RagOperation) { return operation.completedAt ? formatDate(operation.completedAt) : formatDuration(operation.durationMilliseconds); }

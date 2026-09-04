@@ -75,7 +75,7 @@ export function DashboardLayout({
   };
 
   return (
-    <main className="flex h-dvh w-full overflow-hidden bg-zinc-50 text-zinc-950 dark:bg-[#050505] dark:text-zinc-100">
+    <main className="flex h-dvh w-full overflow-hidden bg-[var(--runiq-page-surface)] text-zinc-950 dark:text-zinc-100">
       {isMobileSidebarOpen && (
         <button
           type="button"
@@ -87,7 +87,7 @@ export function DashboardLayout({
 
       <aside
         className={[
-          'fixed inset-y-0 left-0 z-40 flex h-dvh flex-col border-r border-zinc-200 bg-white p-5 shadow-2xl transition-all duration-200 dark:border-zinc-800 dark:bg-[#070707] lg:static lg:z-auto lg:shadow-none',
+          'fixed inset-y-0 left-0 z-40 flex h-dvh flex-col border-r border-zinc-200 bg-[var(--runiq-sidebar-surface)] p-5 shadow-2xl transition-all duration-200 dark:border-zinc-800 lg:static lg:z-auto lg:shadow-none',
           isMobileSidebarOpen
             ? 'translate-x-0'
             : '-translate-x-full lg:translate-x-0',
@@ -183,7 +183,7 @@ export function DashboardLayout({
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col">
-<header className="flex h-[88px] shrink-0 items-center justify-between gap-4 border-b border-zinc-200 bg-white px-6 dark:border-zinc-800 dark:bg-[#050505] lg:px-10">
+<header className="flex h-[88px] shrink-0 items-center justify-between gap-4 border-b border-zinc-200 bg-[var(--runiq-page-surface)] px-6 dark:border-zinc-800 lg:px-10">
   <div className="flex min-w-0 items-center gap-4">
     <button
       type="button"

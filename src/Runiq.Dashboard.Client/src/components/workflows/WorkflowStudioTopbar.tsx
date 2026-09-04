@@ -13,7 +13,7 @@ export function WorkflowStudioTopbar({
   status,
 }: WorkflowStudioTopbarProps) {
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-[#050505]">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-zinc-200 bg-[var(--runiq-page-surface)] px-4 dark:border-zinc-800">
       <div className="flex min-w-0 items-center gap-4">
         <button
           type="button"
