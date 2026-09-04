@@ -25,11 +25,5 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
     <ProjectReference Include="..\Runiq.AI.Core\Runiq.AI.Core.csproj" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
   </ItemGroup>
 </Project>

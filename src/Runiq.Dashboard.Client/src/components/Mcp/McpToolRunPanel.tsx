@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import type {
   ToolJsonSchema,
@@ -14,6 +14,10 @@ type McpToolRunPanelProps = {
 type ToolInputValue = string | boolean;
 
 export function McpToolRunPanel({ tool }: McpToolRunPanelProps) {
+  return <McpToolRunPanelContent key={JSON.stringify(tool)} tool={tool} />;
+}
+
+function McpToolRunPanelContent({ tool }: McpToolRunPanelProps) {
   const inputProperties = getSchemaProperties(tool.inputSchema);
 
   const [inputValues, setInputValues] = useState<Record<string, ToolInputValue>>(
@@ -23,13 +27,6 @@ export function McpToolRunPanel({ tool }: McpToolRunPanelProps) {
   const [isRunning, setRunning] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    setInputValues(createDefaultInputValues(tool.inputSchema));
-    setResult(null);
-    setErrorMessage(null);
-    setValidationErrors({});
-  }, [tool]);
 
   const inputPayload = useMemo(() => {
     if (!tool.hasInput || inputProperties.length === 0) {

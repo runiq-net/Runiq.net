@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import {
   runTool,
@@ -15,6 +15,10 @@ type ToolRunPanelProps = {
 type ToolInputValue = string | boolean;
 
 export function ToolRunPanel({ tool }: ToolRunPanelProps) {
+  return <ToolRunPanelContent key={JSON.stringify(tool)} tool={tool} />;
+}
+
+function ToolRunPanelContent({ tool }: ToolRunPanelProps) {
   const inputProperties = getSchemaProperties(tool.inputSchema);
 
   const [inputValues, setInputValues] = useState<Record<string, ToolInputValue>>(
@@ -23,12 +27,6 @@ export function ToolRunPanel({ tool }: ToolRunPanelProps) {
   const [result, setResult] = useState<ToolRunResponse | null>(null);
   const [isRunning, setRunning] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    setInputValues(createDefaultInputValues(tool.inputSchema));
-    setResult(null);
-    setErrorMessage(null);
-  }, [tool]);
 
   const inputPayload = useMemo(() => {
     if (!tool.hasInput || inputProperties.length === 0) {
