@@ -28,4 +28,7 @@ public enum RagNoContextReason
 
     /// <summary>Reranking completed, but its structured aggregate answerability was not answerable.</summary>
     NotAnswerable = 4,
+
+    /// <summary>Retrieval produced accepted results, but fail-closed reranking prevented context assembly.</summary>
+    RerankingFailed = 5,
 }

@@ -411,8 +411,9 @@ public sealed class AgentExecutionRuntime
             {
                 runtimeContext = await SearchRagContextAsync(
                     activeRag, indexName, query.Message, cancellationToken);
+                var acceptedResults = runtimeContext.AcceptedRagResults;
                 var reranking = await RagRerankingProcessor.ExecuteAsync(
-                    query.Message, runtimeContext.AcceptedRagResults, activeRag.Reranking, ragReranker,
+                    query.Message, acceptedResults, activeRag.Reranking, ragReranker,
                     cancellationToken);
                 rerankingBlocksExecution = reranking.BlocksExecution;
                 var answerabilityBlocksContext =
@@ -421,16 +422,22 @@ public sealed class AgentExecutionRuntime
                     reranking.Metadata.Outcome == RagRerankingOutcome.Succeeded &&
                     reranking.Metadata.Answerability != RagAnswerability.Answerable;
                 runtimeContext = new AgentRuntimeContext(
-                    answerabilityBlocksContext ? [] : reranking.OrderedResults,
+                    rerankingBlocksExecution || answerabilityBlocksContext ? [] : reranking.OrderedResults,
                     runtimeContext.RetrievedRagCandidates,
                     runtimeContext.RejectedRagCandidates,
-                    answerabilityBlocksContext ? RagNoContextReason.NotAnswerable : runtimeContext.NoContextReason,
+                    rerankingBlocksExecution
+                        ? RagNoContextReason.RerankingFailed
+                        : answerabilityBlocksContext
+                            ? RagNoContextReason.NotAnswerable
+                            : runtimeContext.NoContextReason,
                     runtimeContext.RetrievalStatistics,
-                    reranking.OrderedResults,
-                    contextExcludedResults: answerabilityBlocksContext
-                        ? reranking.OrderedResults.Select(result => new RagContextExcludedResult(
+                    rerankingBlocksExecution ? acceptedResults : reranking.OrderedResults,
+                    contextExcludedResults: rerankingBlocksExecution || answerabilityBlocksContext
+                        ? acceptedResults.Select(result => new RagContextExcludedResult(
                             result,
-                            RagContextSelectionExclusionReason.NotAnswerable,
+                            rerankingBlocksExecution
+                                ? RagContextSelectionExclusionReason.RerankingFailed
+                                : RagContextSelectionExclusionReason.NotAnswerable,
                             RagContextAssembler.EstimateTokens(result.Chunk.Content))).ToArray()
                         : null,
                     reranking: reranking.Metadata);

@@ -22,4 +22,7 @@ public enum RagContextSelectionExclusionReason
 
     /// <summary>The structured reranker answerability decision did not permit grounded model context.</summary>
     NotAnswerable = 4,
+
+    /// <summary>Fail-closed reranking prevented the accepted chunk from entering model context.</summary>
+    RerankingFailed = 5,
 }

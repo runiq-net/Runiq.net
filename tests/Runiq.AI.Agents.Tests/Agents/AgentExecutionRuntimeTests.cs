@@ -1237,8 +1237,15 @@ public sealed class AgentRagExecutionRuntimeTests
             .ExecuteStreamAsync(agent.Id, "question").ToListAsync();
 
         var failed = Assert.Single(events, item => item.Kind == AgentExecutionEventKind.Failed);
+        var completed = Assert.IsType<RagSearchCompleted>(Assert.Single(events, item => item.RagSearch is RagSearchCompleted).RagSearch);
         Assert.Equal("RagRerankingFailed", failed.ErrorCode);
         Assert.Equal(RagRerankingOutcome.Failed, failed.Rag!.Reranking!.Outcome);
+        Assert.Single(failed.Rag.AcceptedResults);
+        Assert.Empty(failed.Rag.ContextSelectedResults);
+        Assert.Equal(RagNoContextReason.RerankingFailed, failed.Rag.NoContextReason);
+        Assert.Empty(completed.SelectedResults);
+        Assert.Equal(RagNoContextReason.RerankingFailed, completed.NoContextReason);
+        Assert.Equal(RagContextSelectionExclusionReason.RerankingFailed, Assert.Single(completed.ContextExcludedResults).Reason);
         Assert.Empty(client.Requests);
         Assert.DoesNotContain(events, item => item.RagSearch is RagSearchFailed);
     }
