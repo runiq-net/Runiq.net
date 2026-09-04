@@ -3,11 +3,15 @@ using Runiq.AI.Cli.Models;
 
 namespace Runiq.AI.Cli.Generation;
 
+/// <summary>Generates Runiq package, host, security, and controller integration for a CLI-created API project.</summary>
 public sealed class RuniqIntegrationGenerator
 {
     private readonly IFileSystem _fileSystem;
     private readonly IProcessRunner _processRunner;
 
+    /// <summary>Creates a generator backed by the supplied filesystem and process abstractions.</summary>
+    /// <param name="fileSystem">Filesystem used to create generated artifacts.</param>
+    /// <param name="processRunner">Process runner used for .NET project operations.</param>
     public RuniqIntegrationGenerator(
         IFileSystem fileSystem,
         IProcessRunner processRunner)
@@ -16,6 +20,9 @@ public sealed class RuniqIntegrationGenerator
         _processRunner = processRunner;
     }
 
+    /// <summary>Applies the selected project definition to an API project.</summary>
+    /// <param name="definition">Selected Runiq project features and provider settings.</param>
+    /// <param name="apiProjectPath">Path to the target API project file.</param>
     public void Generate(
         ProjectDefinition definition,
         string apiProjectPath)
@@ -23,6 +30,30 @@ public sealed class RuniqIntegrationGenerator
         AddPackages(definition, apiProjectPath);
         ConfigureUserSecrets(definition, apiProjectPath);
         UpdateProgram(definition, apiProjectPath);
+        WriteStatusController(definition, apiProjectPath);
+    }
+
+    private void WriteStatusController(ProjectDefinition definition, string apiProjectPath)
+    {
+        var projectDirectory = Path.GetDirectoryName(apiProjectPath)
+            ?? throw new InvalidOperationException("API project path has no parent directory.");
+        var controllersDirectory = Path.Combine(projectDirectory, "Controllers");
+        _fileSystem.CreateDirectory(controllersDirectory);
+        _fileSystem.WriteAllText(Path.Combine(controllersDirectory, "StatusController.cs"), $$"""
+            using Microsoft.AspNetCore.Mvc;
+
+            namespace {{definition.Name}}.Api.Controllers;
+
+            /// <summary>Reports whether the generated API host is running.</summary>
+            [ApiController]
+            [Route("")]
+            public sealed class StatusController : ControllerBase
+            {
+                /// <summary>Returns the generated API status message.</summary>
+                [HttpGet]
+                public ActionResult<string> Get() => "{{definition.Name}} API is running.";
+            }
+            """);
     }
 
     private void AddPackages(
@@ -181,8 +212,8 @@ public sealed class RuniqIntegrationGenerator
                   options.Title = "{{definition.Name}}";
                   options.Authentication(auth =>
                   {
-                      // Development default for generated projects.
-                      auth.AllowAnonymous();
+                      if (app.Environment.IsDevelopment()) auth.AllowAnonymous();
+                      else auth.RequireAuthenticatedUser();
                   });
               });
               """
@@ -198,6 +229,7 @@ public sealed class RuniqIntegrationGenerator
                var builder = WebApplication.CreateBuilder(args);
 
                builder.Services.AddOpenApi();
+               builder.Services.AddControllers();
                {{addRuniqServer}}{{mcpServices}}
 
                var app = builder.Build();
@@ -209,7 +241,7 @@ public sealed class RuniqIntegrationGenerator
 
                app.UseHttpsRedirection();
 
-               app.MapGet("/", () => "{{definition.Name}} API is running.");{{dashboardMiddleware}}{{mcpEndpoints}}
+               app.MapControllers();{{dashboardMiddleware}}{{mcpEndpoints}}
 
                app.Run();
                """;

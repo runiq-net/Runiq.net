@@ -1,35 +1,40 @@
 using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Runiq.AI.Agents.Tools;
 
 /// <summary>
-/// Agent'a bagli typed tool kayitlarini runtime sirasinda çalistirir.
+/// Invokes typed tools registered for an agent at runtime.
 /// </summary>
 public sealed class AgentToolInvoker
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<AgentToolInvoker> logger;
 
     /// <summary>
-    /// Tool instance'larini DI üzerinden olusturabilecek invoker örnegini baslatir.
+    /// Initializes an invoker that resolves tool dependencies from the active service provider.
     /// </summary>
-    /// <param name="serviceProvider">Tool bagimliliklarini çözecek servis saglayici.</param>
-    public AgentToolInvoker(IServiceProvider serviceProvider)
+    /// <param name="serviceProvider">Service provider used to resolve tool dependencies.</param>
+    /// <param name="logger">Logger that receives detailed server-side invocation failures.</param>
+    public AgentToolInvoker(IServiceProvider serviceProvider, ILogger<AgentToolInvoker>? logger = null)
     {
         _serviceProvider = serviceProvider;
+        this.logger = logger ?? NullLogger<AgentToolInvoker>.Instance;
     }
 
     /// <summary>
-    /// Verilen agent üzerinde tanimli tool'u JSON argümanlariyla çalistirir.
+    /// Invokes a tool registered on an agent with JSON arguments.
     /// </summary>
-    /// <param name="agent">Tool kaydini tasiyan agent.</param>
-    /// <param name="toolName">Model tarafindan çagrilan tool adi.</param>
-    /// <param name="argumentsJson">Model tarafindan üretilen tool input JSON degeri.</param>
-    /// <param name="cancellationToken">Iptal belirteci.</param>
-    /// <returns>Tool çalistirma sonucunu JSON output olarak döner.</returns>
+    /// <param name="agent">Agent that owns the tool registration.</param>
+    /// <param name="toolName">Name of the tool requested by the model.</param>
+    /// <param name="argumentsJson">JSON input produced by the model.</param>
+    /// <param name="cancellationToken">Token that cancels tool execution.</param>
+    /// <returns>The normalized invocation result and JSON output.</returns>
     public async Task<AgentToolInvocationResult> InvokeAsync(
         Agent agent,
         string toolName,
@@ -62,12 +67,12 @@ public sealed class AgentToolInvoker
     }
 
     /// <summary>
-    /// Verilen typed tool kaydini JSON argümanlariyla dogrudan çalistirir.
+    /// Invokes a typed tool registration directly with JSON arguments.
     /// </summary>
-    /// <param name="tool">Çalistirilacak tool kaydidir.</param>
-    /// <param name="argumentsJson">Tool input JSON degeridir.</param>
-    /// <param name="cancellationToken">Iptal belirteci.</param>
-    /// <returns>Tool çalistirma sonucunu JSON output olarak döner.</returns>
+    /// <param name="tool">Tool registration to invoke.</param>
+    /// <param name="argumentsJson">JSON tool input.</param>
+    /// <param name="cancellationToken">Token that cancels tool execution.</param>
+    /// <returns>The normalized invocation result and JSON output.</returns>
     public async Task<AgentToolInvocationResult> InvokeAsync(
         AgentToolRegistration tool,
         string argumentsJson,
@@ -86,21 +91,25 @@ public sealed class AgentToolInvoker
         }
         catch (JsonException exception)
         {
+            logger.LogWarning(exception, "Tool {ToolName} input binding failed.", tool.Name);
             return AgentToolInvocationResult.Failure(
                 "ToolInputInvalid",
-                $"Tool '{tool.Name}' input could not be deserialized. {exception.Message}");
+                $"Tool '{tool.Name}' input has an invalid format.");
         }
         catch (TargetInvocationException exception) when (exception.InnerException is not null)
         {
+            logger.LogError(exception.InnerException, "Tool {ToolName} execution failed.", tool.Name);
             return AgentToolInvocationResult.Failure(
                 "ToolExecutionFailed",
-                exception.InnerException.Message);
+                "The tool could not be executed.");
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception exception)
         {
+            logger.LogError(exception, "Tool {ToolName} execution failed.", tool.Name);
             return AgentToolInvocationResult.Failure(
                 "ToolExecutionFailed",
-                exception.Message);
+                "The tool could not be executed.");
         }
     }
 
@@ -159,8 +168,12 @@ public sealed class AgentToolInvoker
 }
 
 /// <summary>
-/// Runtime tool çalistirma sonucunu temsil eder.
+/// Represents the normalized result of a runtime tool invocation.
 /// </summary>
+/// <param name="IsSuccess">Whether invocation completed successfully.</param>
+/// <param name="OutputJson">Serialized output for a successful invocation.</param>
+/// <param name="ErrorCode">Stable provider-independent failure code.</param>
+/// <param name="ErrorMessage">Safe client-facing failure message.</param>
 public sealed record AgentToolInvocationResult(
     bool IsSuccess,
     string? OutputJson,
@@ -168,8 +181,10 @@ public sealed record AgentToolInvocationResult(
     string? ErrorMessage)
 {
     /// <summary>
-    /// Basarili tool çalistirma sonucu üretir.
+    /// Creates a successful tool invocation result.
     /// </summary>
+    /// <param name="outputJson">Serialized tool output.</param>
+    /// <returns>A successful invocation result.</returns>
     public static AgentToolInvocationResult Success(string outputJson)
     {
         return new AgentToolInvocationResult(
@@ -180,8 +195,11 @@ public sealed record AgentToolInvocationResult(
     }
 
     /// <summary>
-    /// Basarisiz tool çalistirma sonucu üretir.
+    /// Creates a failed tool invocation result.
     /// </summary>
+    /// <param name="errorCode">Stable failure code.</param>
+    /// <param name="errorMessage">Safe client-facing failure message.</param>
+    /// <returns>A failed invocation result.</returns>
     public static AgentToolInvocationResult Failure(
         string errorCode,
         string errorMessage)

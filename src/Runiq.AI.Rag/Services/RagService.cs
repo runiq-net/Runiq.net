@@ -91,7 +91,7 @@ public sealed class RagService : IRagService
         ArgumentNullException.ThrowIfNull(source);
         Validate(indexName);
         var pipeline = ResolveIngestionPipeline(indexName);
-        state.Load(ingestionOptions.StatePath);
+        await using var stateLease = await state.AcquireAsync(ingestionOptions.StatePath, cancellationToken).ConfigureAwait(false);
         var started = TimeProvider.System.GetTimestamp();
         var documents = await source.GetDocumentsAsync(cancellationToken).ConfigureAwait(false);
         var failures = new List<RagIngestionFailure>(); var created = 0; var updated = 0; var skipped = 0; var chunks = 0;
@@ -104,7 +104,7 @@ public sealed class RagService : IRagService
             catch (Exception exception) { lock (failures) failures.Add(new RagIngestionFailure { DocumentId = document.Id, Message = exception.Message }); if (ingestionOptions.FailFast) throw; }
         }).ConfigureAwait(false);
         var deleted = ingestionOptions.PropagateDeletes ? await PropagateDeletesAsync(sourceKey, indexName, documents.Select(x => x.Id), pipeline.VectorStore, cancellationToken).ConfigureAwait(false) : 0;
-        state.Save(ingestionOptions.StatePath);
+        await state.SaveAsync(ingestionOptions.StatePath, cancellationToken).ConfigureAwait(false);
         return new RagIngestionReport { DiscoveredDocuments = documents.Count, CreatedDocuments = created, UpdatedDocuments = updated, SkippedDocuments = skipped, DeletedDocuments = deleted, FailedDocuments = failures.Count, CreatedChunks = chunks, Failures = failures, Duration = TimeProvider.System.GetElapsedTime(started) };
     }
 
@@ -112,9 +112,9 @@ public sealed class RagService : IRagService
     public async Task<RagIngestionReport> IngestAsync(RagSourceDocument document, string indexName, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(document); Validate(indexName); var started = TimeProvider.System.GetTimestamp();
-        state.Load(ingestionOptions.StatePath);
+        await using var stateLease = await state.AcquireAsync(ingestionOptions.StatePath, cancellationToken).ConfigureAwait(false);
         var pipeline = ResolveIngestionPipeline(indexName);
-        try { var outcome = await IngestCoreAsync(document, indexName, "application", pipeline.DocumentIngestion, pipeline.UpsertPipeline, pipeline.VectorStore, cancellationToken).ConfigureAwait(false); state.Save(ingestionOptions.StatePath); return new RagIngestionReport { DiscoveredDocuments = 1, CreatedDocuments = outcome.Created, UpdatedDocuments = outcome.Updated, SkippedDocuments = outcome.Skipped, CreatedChunks = outcome.Chunks, Duration = TimeProvider.System.GetElapsedTime(started) }; }
+        try { var outcome = await IngestCoreAsync(document, indexName, "application", pipeline.DocumentIngestion, pipeline.UpsertPipeline, pipeline.VectorStore, cancellationToken).ConfigureAwait(false); await state.SaveAsync(ingestionOptions.StatePath, cancellationToken).ConfigureAwait(false); return new RagIngestionReport { DiscoveredDocuments = 1, CreatedDocuments = outcome.Created, UpdatedDocuments = outcome.Updated, SkippedDocuments = outcome.Skipped, CreatedChunks = outcome.Chunks, Duration = TimeProvider.System.GetElapsedTime(started) }; }
         catch (OperationCanceledException) { throw; }
         catch (Exception exception) { return new RagIngestionReport { DiscoveredDocuments = 1, FailedDocuments = 1, Failures = [new RagIngestionFailure { DocumentId = document.Id, Message = exception.Message }], Duration = TimeProvider.System.GetElapsedTime(started) }; }
     }
@@ -144,8 +144,15 @@ public sealed class RagService : IRagService
             if (!index.Succeeded) throw new InvalidOperationException(index.Reason);
             var persisted = await effectiveUpsertPipeline.UpsertAsync(result, indexName, document.Metadata, dimensions, token).ConfigureAwait(false);
             if (!persisted.Succeeded) throw new InvalidOperationException(persisted.Reason);
-            RagIngestionState.Entry? old; lock (state.Gate) { state.Entries.TryGetValue(key, out old); state.Entries[key] = new RagIngestionState.Entry(hash, result.Chunks.Select(x => x.Id).ToArray()); }
-            if (old is not null && old.ChunkIds.Count > 0) await effectiveVectorStore.DeleteAsync(new DeleteVectorRequest { IndexName = indexName, VectorIds = old.ChunkIds.ToList() }, token).ConfigureAwait(false);
+            var newChunkIds = result.Chunks.Select(x => x.Id).ToArray();
+            RagIngestionState.Entry? old; lock (state.Gate) state.Entries.TryGetValue(key, out old);
+            var staleChunkIds = old?.ChunkIds.Except(newChunkIds, StringComparer.Ordinal).ToList() ?? [];
+            if (staleChunkIds.Count > 0)
+            {
+                var deleted = await effectiveVectorStore.DeleteAsync(new DeleteVectorRequest { IndexName = indexName, VectorIds = staleChunkIds }, token).ConfigureAwait(false);
+                if (!deleted.Succeeded) throw new InvalidOperationException(deleted.Reason);
+            }
+            lock (state.Gate) state.Entries[key] = new RagIngestionState.Entry(hash, newChunkIds);
             return old is null ? (1, 0, 0, result.Chunks.Count) : (0, 1, 0, result.Chunks.Count);
         }
         finally { documentLock.Release(); }

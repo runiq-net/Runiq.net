@@ -32,7 +32,7 @@ export function WorkflowInspectorPanel({
       <button
         type="button"
         onClick={() => onCollapseChange(false)}
-        className="hidden h-full w-11 shrink-0 items-center justify-center border-l border-zinc-200 bg-white text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:bg-[#050505] dark:text-zinc-500 dark:hover:bg-zinc-900 dark:hover:text-zinc-100 lg:flex"
+        className="hidden h-full w-11 shrink-0 items-center justify-center border-l border-zinc-200 bg-[var(--runiq-page-surface)] text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:text-zinc-500 dark:hover:bg-zinc-900 dark:hover:text-zinc-100 lg:flex"
         aria-label="Open inspector"
       >
         <span className="-rotate-90 text-xs font-semibold uppercase tracking-[0.14em]">
@@ -51,7 +51,7 @@ export function WorkflowInspectorPanel({
   const runInput = runResult?.steps[0]?.input ?? currentInput;
 
   return (
-    <aside className="h-full w-full shrink-0 overflow-hidden border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-[#050505] lg:w-[352px]">
+    <aside className="h-full w-full shrink-0 overflow-hidden border-l border-zinc-200 bg-[var(--runiq-page-surface)] dark:border-zinc-800 lg:w-[352px]">
       <div className="flex h-11 items-center justify-between border-b border-zinc-200 px-4 dark:border-zinc-800">
         <div className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-500">
           Inspector

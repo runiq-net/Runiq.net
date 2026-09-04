@@ -2,6 +2,8 @@ using System.Reflection;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Runiq.AI.Core.Mcp;
 
@@ -13,13 +15,17 @@ public sealed class RuniqMcpToolRunApiHandler
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
 
     private readonly IServiceProvider services;
+    private readonly ILogger<RuniqMcpToolRunApiHandler> logger;
 
     /// <summary>
     /// Creates a new MCP tool run API handler.
     /// </summary>
-    public RuniqMcpToolRunApiHandler(IServiceProvider services)
+    /// <param name="services">The active request service provider.</param>
+    /// <param name="logger">Logger that receives detailed server-side tool failures.</param>
+    public RuniqMcpToolRunApiHandler(IServiceProvider services, ILogger<RuniqMcpToolRunApiHandler>? logger = null)
     {
         this.services = services;
+        this.logger = logger ?? NullLogger<RuniqMcpToolRunApiHandler>.Instance;
     }
 
     /// <summary>
@@ -84,6 +90,11 @@ public sealed class RuniqMcpToolRunApiHandler
             return Results.Ok(CreateFailureResponse(exception));
         }
         catch (NotSupportedException exception)
+        {
+            return Results.Ok(CreateFailureResponse(exception));
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception exception)
         {
             return Results.Ok(CreateFailureResponse(exception));
         }
@@ -242,13 +253,14 @@ public sealed class RuniqMcpToolRunApiHandler
         return result;
     }
 
-    private static RuniqMcpToolRunResponse CreateFailureResponse(Exception exception)
+    private RuniqMcpToolRunResponse CreateFailureResponse(Exception exception)
     {
+        logger.LogError(exception, "MCP tool execution failed.");
         return new RuniqMcpToolRunResponse(
             IsSuccess: false,
             OutputJson: null,
-            ErrorCode: exception.GetType().Name,
-            ErrorMessage: exception.Message);
+            ErrorCode: "ToolExecutionFailed",
+            ErrorMessage: "The MCP tool could not be executed.");
     }
 
     private static string ToJsonPropertyName(string value)

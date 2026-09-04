@@ -119,7 +119,7 @@ public sealed class AgentToolInvokerTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("ToolInputInvalid", result.ErrorCode);
-        Assert.Contains("input could not be deserialized", result.ErrorMessage);
+        Assert.Equal("Tool 'weather' input has an invalid format.", result.ErrorMessage);
         Assert.Null(result.OutputJson);
     }
 
@@ -139,7 +139,7 @@ public sealed class AgentToolInvokerTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("ToolExecutionFailed", result.ErrorCode);
-        Assert.Equal("Tool failed intentionally.", result.ErrorMessage);
+        Assert.Equal("The tool could not be executed.", result.ErrorMessage);
         Assert.Null(result.OutputJson);
     }
 

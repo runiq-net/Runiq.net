@@ -78,7 +78,7 @@ public static class RuniqAgentServerServiceCollectionExtensions
         services.AddHttpClient<OpenAICompatibleClient>();
         services.TryAddSingleton<IModelCapabilityResolver, DefaultModelCapabilityResolver>();
         services.TryAddScoped<IChatClientResolver, ChatClientResolver>();
-        services.AddSingleton<AgentToolInvoker>();
+        services.AddScoped<AgentToolInvoker>();
 
         services.AddScoped<ToolRunApiHandler>();
         services.AddScoped<RagObservabilityProjection>(provider => new RagObservabilityProjection(

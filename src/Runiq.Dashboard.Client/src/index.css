@@ -20,6 +20,8 @@
     --runiq-status-neutral-bg: #fafafa;
     --runiq-status-neutral-border: #e4e4e7;
     --runiq-status-neutral-text: #52525b;
+    --runiq-page-surface: #f8fafc;
+    --runiq-sidebar-surface: #ffffff;
   }
 
   .dark {
@@ -39,6 +41,8 @@
     --runiq-status-neutral-bg: #18181b;
     --runiq-status-neutral-border: #27272a;
     --runiq-status-neutral-text: #d4d4d8;
+    --runiq-page-surface: #050505;
+    --runiq-sidebar-surface: #070707;
   }
 
   html,
@@ -51,10 +55,10 @@
 
   body {
     overflow: hidden;
-    background: #f8fafc;
+    background: var(--runiq-page-surface);
   }
 
   html.dark body {
-    background: #050505;
+    background: var(--runiq-page-surface);
   }
 }
