@@ -1102,6 +1102,126 @@ public sealed class AgentRagExecutionRuntimeTests
         Assert.Empty(client.Requests);
     }
 
+    // Proves Grounded and Required modes fail closed when successful reranking cannot determine answerability.
+    [Theory]
+    [InlineData(RagExecutionMode.Grounded)]
+    [InlineData(RagExecutionMode.Required)]
+    public async Task ExecuteStreamAsync_EnforcedModeWithUnknownAnswerability_AppliesNoContextPolicy(
+        RagExecutionMode mode)
+    {
+        var agent = CreateAgent(mode, RagNoContextBehavior.ReturnNotFound);
+        agent.Rag!.Reranking.Enabled = true;
+        var candidate = CreateCandidate("first", "doc-a", "content", 0.9, RagScoreMetrics.CosineSimilarity, true);
+        var reranker = new StaticReranker(new RagRerankResult(
+            [new("doc-a", "first", 0.8, RagAnswerability.Unknown)],
+            RagAnswerability.Unknown));
+        var client = new ScriptedChatClient();
+
+        var result = await CreateRuntime(agent, client, new StaticRetriever([candidate]), reranker)
+            .ExecuteAsync(agent, "question");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(RagNoContextReason.NotAnswerable, result.Rag!.NoContextReason);
+        Assert.Equal(RagAnswerability.Unknown, result.Rag.Reranking!.Answerability);
+        Assert.Equal(RagContextSelectionExclusionReason.NotAnswerable,
+            Assert.Single(result.Rag.ContextExcludedResults).Reason);
+        Assert.Empty(client.Requests);
+    }
+
+    // Proves Open mode records aggregate unanswerability but continues with reranked context and model execution.
+    [Fact]
+    public async Task ExecuteStreamAsync_OpenWithNotAnswerable_UsesRerankedContext()
+    {
+        var agent = CreateAgent(RagExecutionMode.Open);
+        agent.Rag!.Reranking.Enabled = true;
+        var candidate = CreateCandidate("first", "doc-a", "content", 0.9, RagScoreMetrics.CosineSimilarity, true);
+        var reranker = new StaticReranker(new RagRerankResult(
+            [new("doc-a", "first", 0.8, RagAnswerability.NotAnswerable)],
+            RagAnswerability.NotAnswerable));
+        var client = new ScriptedChatClient();
+
+        var result = await CreateRuntime(agent, client, new StaticRetriever([candidate]), reranker)
+            .ExecuteAsync(agent, "question");
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Rag!.NoContextReason);
+        Assert.Equal(RagAnswerability.NotAnswerable, result.Rag.Reranking!.Answerability);
+        Assert.Equal("first", Assert.Single(result.Rag.ContextSelectedResults).Chunk.Id);
+        Assert.Single(client.Requests);
+    }
+
+    // Proves aggregate NotAnswerable overrides an Answerable candidate in grounding-enforced modes.
+    [Fact]
+    public async Task ExecuteStreamAsync_AnswerableCandidateWithNotAnswerableAggregate_FailsClosed()
+    {
+        var agent = CreateAgent(RagExecutionMode.Grounded, RagNoContextBehavior.ReturnNotFound);
+        agent.Rag!.Reranking.Enabled = true;
+        var candidate = CreateCandidate("first", "doc-a", "content", 0.9, RagScoreMetrics.CosineSimilarity, true);
+        var reranker = new StaticReranker(new RagRerankResult(
+            [new("doc-a", "first", 0.8, RagAnswerability.Answerable)],
+            RagAnswerability.NotAnswerable));
+        var client = new ScriptedChatClient();
+
+        var result = await CreateRuntime(agent, client, new StaticRetriever([candidate]), reranker)
+            .ExecuteAsync(agent, "question");
+
+        Assert.Equal(RagNoContextReason.NotAnswerable, result.Rag!.NoContextReason);
+        Assert.Equal(RagAnswerability.Answerable, Assert.Single(result.Rag.Reranking!.Candidates).Answerability);
+        Assert.Equal(RagAnswerability.NotAnswerable, result.Rag.Reranking.Answerability);
+        Assert.Empty(client.Requests);
+    }
+
+    // Proves aggregate Answerable remains authoritative when an individual candidate is marked NotAnswerable.
+    [Fact]
+    public async Task ExecuteStreamAsync_NotAnswerableCandidateWithAnswerableAggregate_UsesContext()
+    {
+        var agent = CreateAgent(RagExecutionMode.Grounded);
+        agent.Rag!.Reranking.Enabled = true;
+        var candidate = CreateCandidate("first", "doc-a", "content", 0.9, RagScoreMetrics.CosineSimilarity, true);
+        var reranker = new StaticReranker(new RagRerankResult(
+            [new("doc-a", "first", 0.8, RagAnswerability.NotAnswerable)],
+            RagAnswerability.Answerable));
+        var client = new ScriptedChatClient();
+
+        var result = await CreateRuntime(agent, client, new StaticRetriever([candidate]), reranker)
+            .ExecuteAsync(agent, "question");
+
+        Assert.Null(result.Rag!.NoContextReason);
+        Assert.Equal("first", Assert.Single(result.Rag.ContextSelectedResults).Chunk.Id);
+        Assert.Equal(RagAnswerability.NotAnswerable, Assert.Single(result.Rag.Reranking!.Candidates).Answerability);
+        Assert.Single(client.Requests);
+    }
+
+    // Proves context-budget selection runs after reranking and can exclude a reranked candidate without losing metadata.
+    [Fact]
+    public async Task ExecuteStreamAsync_RerankedCandidateExceedingContextBudget_IsExcludedAfterReranking()
+    {
+        var agent = CreateAgent(RagExecutionMode.Grounded);
+        agent.Rag!.Reranking.Enabled = true;
+        agent.Rag.ContextBudget.MaximumContextTokens = 500;
+        agent.Rag.ContextBudget.ResponseTokenReserve = 1;
+        var large = CreateCandidate("large", "doc-a", string.Join(' ', Enumerable.Repeat("content", 1_000)),
+            0.9, RagScoreMetrics.CosineSimilarity, true);
+        var small = CreateCandidate("small", "doc-b", "short content", 0.8, RagScoreMetrics.CosineSimilarity, true);
+        var reranker = new StaticReranker(new RagRerankResult(
+            [
+                new("doc-a", "large", 0.95, RagAnswerability.Answerable),
+                new("doc-b", "small", 0.8, RagAnswerability.Answerable),
+            ],
+            RagAnswerability.Answerable));
+        var client = new ScriptedChatClient();
+
+        var result = await CreateRuntime(agent, client, new StaticRetriever([small, large]), reranker)
+            .ExecuteAsync(agent, "question");
+
+        Assert.Equal("small", Assert.Single(result.Rag!.ContextSelectedResults).Chunk.Id);
+        var excluded = Assert.Single(result.Rag.ContextExcludedResults);
+        Assert.Equal("large", excluded.Result.Chunk.Id);
+        Assert.Equal(RagContextSelectionExclusionReason.TokenBudgetExceeded, excluded.Reason);
+        Assert.Equal(["large", "small"], result.Rag.Reranking!.Candidates.Select(item => item.ChunkId));
+        Assert.Single(client.Requests);
+    }
+
     // Proves the reranker fail policy publishes a distinct structured failure and blocks model execution.
     [Fact]
     public async Task ExecuteStreamAsync_RerankerFailureWithFailPolicy_BlocksModel()
@@ -1121,6 +1241,32 @@ public sealed class AgentRagExecutionRuntimeTests
         Assert.Equal(RagRerankingOutcome.Failed, failed.Rag!.Reranking!.Outcome);
         Assert.Empty(client.Requests);
         Assert.DoesNotContain(events, item => item.RagSearch is RagSearchFailed);
+    }
+
+    // Proves the runtime applies both failure policies when reranking is enabled without a DI registration.
+    [Theory]
+    [InlineData(RagRerankerFailurePolicy.UseOriginalOrder, RagRerankingOutcome.Fallback, true, 1)]
+    [InlineData(RagRerankerFailurePolicy.Fail, RagRerankingOutcome.Failed, false, 0)]
+    public async Task ExecuteAsync_MissingRerankerRegistration_AppliesFailurePolicy(
+        RagRerankerFailurePolicy failurePolicy,
+        RagRerankingOutcome expectedOutcome,
+        bool expectedSuccess,
+        int expectedModelRequests)
+    {
+        var agent = CreateAgent();
+        agent.Rag!.Reranking.Enabled = true;
+        agent.Rag.Reranking.FailurePolicy = failurePolicy;
+        var candidate = CreateCandidate("first", "doc-a", "content", 0.9, RagScoreMetrics.CosineSimilarity, true);
+        var client = new ScriptedChatClient();
+
+        var result = await CreateRuntime(agent, client, new StaticRetriever([candidate]))
+            .ExecuteAsync(agent, "question");
+
+        Assert.Equal(expectedSuccess, result.IsSuccess);
+        Assert.Equal(expectedOutcome, result.Rag!.Reranking!.Outcome);
+        Assert.Equal("RerankerUnavailable", result.Rag.Reranking.FailureCode);
+        Assert.Equal(expectedModelRequests, client.Requests.Count);
+        Assert.Equal(!expectedSuccess, result.Rag.ModelInvocationSkipped);
     }
 
     private static Agent CreateAgent(

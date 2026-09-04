@@ -44,6 +44,8 @@ public sealed class RagRerankingProcessorTests
         Assert.Equal(["b", "a", "c"], execution.OrderedResults.Select(item => item.Chunk.Id));
         Assert.Equal(1, reranker.CallCount);
         Assert.Equal(2, reranker.Request!.Candidates.Count);
+        Assert.Equal(["a", "b"], reranker.Request.Candidates.Select(item => item.ChunkId));
+        Assert.Equal("c", execution.OrderedResults[2].Chunk.Id);
         Assert.Equal(0.8, execution.OrderedResults[1].RawScore);
         Assert.Equal(2, execution.Metadata.Candidates[0].OriginalRank);
         Assert.Equal(1, execution.Metadata.Candidates[0].RerankRank);
@@ -115,12 +117,14 @@ public sealed class RagRerankingProcessorTests
             Timeout = TimeSpan.FromMilliseconds(10),
         };
 
+        var reranker = new CancellingReranker();
         var execution = await RagRerankingProcessor.ExecuteAsync(
-            "query", CreateResults(), options, new CancellingReranker(), CancellationToken.None);
+            "query", CreateResults(), options, reranker, CancellationToken.None);
 
         Assert.True(execution.Metadata.TimedOut);
         Assert.Equal("RerankerTimeout", execution.Metadata.FailureCode);
         Assert.Equal(RagRerankingOutcome.Fallback, execution.Metadata.Outcome);
+        Assert.True(reranker.ProviderCancellationObserved);
     }
 
     // Proves caller cancellation propagates unchanged and is not converted into reranker timeout.
@@ -134,6 +138,47 @@ public sealed class RagRerankingProcessorTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             RagRerankingProcessor.ExecuteAsync(
                 "query", CreateResults(), options, new CancellingReranker(), source.Token));
+    }
+
+    // Proves an enabled reranker treats an empty accepted set as a successful no-op without provider invocation.
+    [Fact]
+    public async Task ExecuteAsync_EmptyAcceptedResults_CompletesWithoutInvocation()
+    {
+        var reranker = new RecordingReranker(CreateResponse());
+        var options = new RagRerankingOptions { Enabled = true };
+
+        var execution = await RagRerankingProcessor.ExecuteAsync(
+            "query", [], options, reranker, CancellationToken.None);
+
+        Assert.Empty(execution.OrderedResults);
+        Assert.Equal(0, reranker.CallCount);
+        Assert.False(execution.BlocksExecution);
+        Assert.Equal(RagRerankingOutcome.Succeeded, execution.Metadata.Outcome);
+        Assert.Equal(RagAnswerability.Unknown, execution.Metadata.Answerability);
+        Assert.False(execution.Metadata.Ran);
+        Assert.Equal(0, execution.Metadata.CandidateCount);
+    }
+
+    // Proves a missing reranker registration follows each configured failure policy deterministically.
+    [Theory]
+    [InlineData(RagRerankerFailurePolicy.UseOriginalOrder, RagRerankingOutcome.Fallback, false)]
+    [InlineData(RagRerankerFailurePolicy.Fail, RagRerankingOutcome.Failed, true)]
+    public async Task ExecuteAsync_MissingReranker_UsesConfiguredFailurePolicy(
+        RagRerankerFailurePolicy failurePolicy,
+        RagRerankingOutcome expectedOutcome,
+        bool expectedToBlock)
+    {
+        var results = CreateResults();
+        var options = new RagRerankingOptions { Enabled = true, FailurePolicy = failurePolicy };
+
+        var execution = await RagRerankingProcessor.ExecuteAsync(
+            "query", results, options, null, CancellationToken.None);
+
+        Assert.Equal(results, execution.OrderedResults);
+        Assert.Equal(expectedOutcome, execution.Metadata.Outcome);
+        Assert.Equal("RerankerUnavailable", execution.Metadata.FailureCode);
+        Assert.Equal(expectedToBlock, execution.BlocksExecution);
+        Assert.False(execution.Metadata.Ran);
     }
 
     private static IReadOnlyList<RagSearchResult> CreateResults() =>
@@ -175,12 +220,21 @@ public sealed class RagRerankingProcessorTests
 
     private sealed class CancellingReranker : IRagReranker
     {
+        public bool ProviderCancellationObserved { get; private set; }
+
         public async Task<RagRerankResult> RerankAsync(
             RagRerankRequest request,
             CancellationToken cancellationToken = default)
         {
-            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-            throw new UnreachableException();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                throw new UnreachableException();
+            }
+            finally
+            {
+                ProviderCancellationObserved = cancellationToken.IsCancellationRequested;
+            }
         }
     }
 }
