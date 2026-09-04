@@ -1,10 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Runiq.AI.Core.Studio;
-using Runiq.AI.Workflows.Hosting;
 using Runiq.AI.Workflows.Infrastructure;
 using Runiq.AI.Workflows.Interfaces;
 using Runiq.AI.Workflows.Services;
+using Runiq.AI.Workflows.Controllers;
 
 namespace Runiq.AI.Workflows;
 
@@ -50,7 +48,8 @@ public static class RuniqWorkflowsServiceCollectionExtensions
         services.AddSingleton<IAgentStepResolver, RegisteredAgentStepResolver>();
         services.AddScoped<IAgentStepExecutor, RuniqAgentStepExecutor>();
         services.AddScoped<IFlowRunner, FlowRunner>();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IRuniqDashboardEndpointContributor, RuniqWorkflowDashboardEndpointContributor>());
+        services.AddMvcCore()
+            .AddApplicationPart(typeof(WorkflowController).Assembly);
 
         return services;
     }

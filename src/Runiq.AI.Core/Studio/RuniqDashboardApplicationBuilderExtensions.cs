@@ -3,8 +3,6 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Runiq.AI.Core.Dashboard;
-using Runiq.AI.Core.Mcp;
-using Runiq.AI.Core.Rag;
 using Runiq.AI.Core.Studio;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
@@ -63,13 +61,7 @@ public static class RuniqDashboardApplicationBuilderExtensions
 
         app.UseEndpoints(endpoints =>
         {
-            endpoints.MapRuniqMcpApi($"{basePath}/api");
-            endpoints.MapRuniqRagApi($"{basePath}/api");
-
-            foreach (var contributor in app.ApplicationServices.GetServices<IRuniqDashboardEndpointContributor>())
-            {
-                contributor.MapEndpoints(endpoints, basePath);
-            }
+            endpoints.MapGroup(basePath).MapControllers();
         });
 
         app.Use(async (context, next) =>
