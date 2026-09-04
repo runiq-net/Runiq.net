@@ -144,9 +144,37 @@ invalidates the complete response.
 
 `FailurePolicy = Fail` prevents model execution. `UseOriginalOrder` preserves the exact accepted retrieval order
 for unavailable services, timeouts, exceptions, and invalid output, and exposes the fallback through structured
-metadata. Caller cancellation still propagates, while `Timeout` is classified separately. Aggregate and
-per-candidate `RagAnswerability` are observable. `Grounded` and `Required` apply their configured no-context policy
-when a successful reranker result is not `Answerable`; `Open` keeps the evidence and continues normally.
+metadata. Caller cancellation still propagates, while `Timeout` is classified separately.
+
+### Answerability acceptance criteria
+
+Answerability is an agent execution policy, not another retrieval acceptance score. The following rules are
+normative:
+
+1. Only a successful reranking result with aggregate `Answerable` establishes answerability for `Grounded` and
+   `Required`. Aggregate `Unknown` and `NotAnswerable` both fail closed: all reranked candidates are excluded from
+   model context, `NoContextReason` is `NotAnswerable`, and the configured `NoContextBehavior` is applied. The
+   reranking metadata retains the original aggregate value, so operators can distinguish `Unknown` from
+   `NotAnswerable` even though their execution outcome is the same.
+2. Candidate-level answerability is observability metadata only. It does not independently include or exclude a
+   candidate, override aggregate answerability, or change context assembly.
+3. Aggregate answerability is authoritative when aggregate and candidate signals disagree. For example, one or
+   more `Answerable` candidates with aggregate `NotAnswerable` still produce no context in `Grounded` and
+   `Required`; aggregate `Answerable` does not remove an individual candidate marked `NotAnswerable`.
+4. `Open` deliberately ignores answerability for execution gating. It keeps the reranked evidence, applies the
+   reranked order, and invokes the model normally while still publishing aggregate and candidate answerability for
+   observability.
+5. Answerability gating applies only when the reranker outcome is `Succeeded`. `Fallback` follows
+   `FailurePolicy = UseOriginalOrder` and preserves the pre-rerank accepted context; `Failed` with
+   `FailurePolicy = Fail` blocks model execution as a reranking failure rather than a no-context outcome.
+
+The resulting successful-rerank behavior is:
+
+| RAG mode | Aggregate `Answerable` | Aggregate `Unknown` | Aggregate `NotAnswerable` |
+|---|---|---|---|
+| `Open` | Use reranked context | Use reranked context | Use reranked context |
+| `Grounded` | Use reranked context | Apply no-context policy | Apply no-context policy |
+| `Required` | Use reranked context | Apply no-context policy | Apply no-context policy |
 
 Context selection is a separate stage after acceptance. The runtime calculates
 `MaximumContextTokens - instructions - conversation history - user query - response reserve - other required prompt`
