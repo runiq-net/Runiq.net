@@ -211,6 +211,60 @@ be split and count as additional documents. Confirm current limits and prices be
 https://docs.cohere.com/v2/reference/rerank,
 https://docs.cohere.com/v2/docs/rate-limits, and https://cohere.com/pricing.
 
+### Performance and operational acceptance criteria
+
+The following values are initial Runiq release SLOs, not provider guarantees. Measure them per environment and
+model, and tighten or relax them only from production evidence:
+
+| Criterion | Release target |
+|---|---|
+| Reranking stage latency | p50 <= 300 ms, p95 <= 1 s, p99 <= 2 s over completed provider invocations |
+| Hard request bound | `Timeout` defaults to 5 s; no provider work may continue after its cancellation token fires |
+| End-to-end latency cost | Reranking-enabled p95 may add at most 1 s versus the paired disabled baseline |
+| Success ratio | >= 99% of eligible reranking attempts |
+| Fallback ratio | < 1% of eligible reranking attempts |
+| Blocked failure ratio | < 0.1% of eligible reranking attempts |
+| Timeout ratio | < 0.5% of provider invocations |
+
+An *eligible reranking attempt* has `requested = true` and `candidateCount > 0`. Empty accepted-result sets are
+successful no-ops and are excluded from provider reliability ratios. Classify outcomes from the content-free
+metadata as follows:
+
+- success: `outcome = Succeeded`;
+- fallback: `outcome = Fallback`;
+- blocked failure: `outcome = Failed`;
+- timeout: `timedOut = true` or `failureCode = RerankerTimeout`.
+
+Compute `runiq.rag.reranking.duration` as a histogram from `duration`, and
+`runiq.rag.reranking.attempts` as a counter partitioned by `outcome`, `failurePolicy`, `timedOut`, agent, model,
+and environment. Do not use query, document/chunk identity, content, exception text, API key, or tenant/user ID as
+metric labels. Alert when a ratio breaches its target for two consecutive 15-minute windows with at least 100
+eligible attempts; use a longer evaluation window for lower-volume systems. The per-execution Agent Chat payload
+provides the source fields, but production aggregation should be exported by the host's metrics pipeline rather
+than scraped from the Dashboard.
+
+`MaximumCandidates` defaults to five because the default acceptance policy also selects at most five results.
+That keeps the normal path complete while bounding cross-encoder latency, transmitted untrusted text, and provider
+usage. Raising it is justified only when `MaximumAcceptedResults` is also higher and an evaluation demonstrates a
+quality gain; lowering it is appropriate for tighter latency or data-egress budgets. Candidates beyond the bound
+retain their original relative order and are not billed or transmitted by the reranker adapter.
+
+Before enabling reranking in production, compare enabled and disabled variants on the same versioned query set,
+retrieval candidates, prompts, model, and context budget. Use paired measurements and record at least:
+
+- ranking quality (`NDCG@5` as the primary metric and `MRR@5` as a secondary metric);
+- grounded-answer correctness or reviewer acceptance;
+- no-context rate split by `Unknown` and `NotAnswerable`;
+- reranking-stage and end-to-end p50/p95/p99 latency;
+- success, fallback, blocked failure, and timeout ratios;
+- provider search units and estimated cost per 1,000 agent executions.
+
+The release gate is a >= 3% relative improvement in the chosen primary quality metric, no critical language,
+tenant, document-type, or safety slice regressing by more than one percentage point, and compliance with every
+latency/reliability target above. If the quality gate is not met, keep reranking disabled. If quality passes but an
+operational target fails, reduce candidates, select a lower-latency model, or improve provider capacity before
+release; do not hide the regression with a longer timeout.
+
 Context selection is a separate stage after acceptance. The runtime calculates
 `MaximumContextTokens - instructions - conversation history - user query - response reserve - other required prompt`
 and selects only complete chunks whose final serialized external-context message fits. The deterministic fallback
@@ -262,6 +316,14 @@ metric, direction, and any rejection reason. Streaming and non-streaming executi
 `IsAnswerGrounded` reports the applied framework policy; it is not independent semantic verification of model output.
 Agent Chat SSE projects the content-free RAG search lifecycle through dedicated `rag_search_started`,
 `rag_search_completed`, and `rag_search_failed` events instead of serializing runtime result collections.
+
+For completed searches, optional `reranking` observability is an allowlisted contract: stage metadata contains
+`requested`, `ran`, `candidateCount`, `duration`, `outcome`, `failurePolicy`, aggregate `answerability`, `timedOut`,
+optional safe `failureCode`, and `candidates`. Candidate metadata contains only `documentId`, `chunkId`,
+`originalRank`, `rerankRank`, `rerankRelevance`, and candidate `answerability`. It never contains query text,
+chunk content, provider response bodies, exceptions, stack traces, credentials, or arbitrary provider metadata.
+All enum values use stable string names in Agent Chat JSON. A successful answerability rejection additionally uses
+`noContextReason: "NotAnswerable"` and `contextExcludedResults[].reason: "NotAnswerable"`.
 
 ## Tool Design
 

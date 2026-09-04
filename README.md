@@ -105,6 +105,81 @@ policy, and retained as either accepted or rejected runtime metadata before any 
 See the [Agents package guide](src/Runiq.AI.Agents/README.md#rag-execution-and-grounding-policies) for the complete
 policy matrix, relevance acceptance, trust boundary, and structured runtime outcome.
 
+## Production Reranking
+
+Reranking runs after retrieval acceptance and before context-budget selection. The supported Cohere Rerank v2
+adapter can be registered with a credential supplied by an environment variable or another secret provider:
+
+```csharp
+using Runiq.AI.Agents;
+using Runiq.AI.Agents.Configuration;
+using Runiq.AI.Agents.Providers.Cohere;
+
+builder.Services.AddCohereReranker(options =>
+{
+    options.ApiKey = builder.Configuration["COHERE_API_KEY"]
+        ?? throw new InvalidOperationException("COHERE_API_KEY is required.");
+    options.Model = "rerank-v4.0-fast";
+    options.MinimumAnswerableRelevance = 0.5;
+});
+
+builder.Services.AddRuniqServer(options =>
+{
+    options.AddAgent(new Agent(
+            id: "policy-assistant",
+            name: "Policy Assistant",
+            instructions: "Answer employee policy questions.",
+            model: "openai/gpt-5",
+            apiKey: builder.Configuration["OpenAI:ApiKey"])
+        .UseRag(rag =>
+        {
+            rag.IndexName = "company-policies";
+            rag.Mode = RagExecutionMode.Grounded;
+            rag.NoContextBehavior = RagNoContextBehavior.ReturnNotFound;
+            rag.Reranking.Enabled = true;
+            rag.Reranking.MaximumCandidates = 5;
+            rag.Reranking.Timeout = TimeSpan.FromSeconds(5);
+            rag.Reranking.FailurePolicy = RagRerankerFailurePolicy.UseOriginalOrder;
+        }));
+});
+```
+
+For a successful reranker response, aggregate answerability controls execution as follows:
+
+| RAG mode | `Answerable` | `Unknown` | `NotAnswerable` |
+|---|---|---|---|
+| `Open` | Use reranked context | Use reranked context | Use reranked context |
+| `Grounded` | Use reranked context | Apply `NoContextBehavior` | Apply `NoContextBehavior` |
+| `Required` | Use reranked context | Apply `NoContextBehavior` | Apply `NoContextBehavior` |
+
+`Unknown` means the provider or adapter could not establish answerability. It remains distinct in observability,
+but `Grounded` and `Required` deliberately treat it like `NotAnswerable` and fail closed. Candidate-level
+answerability is diagnostic only; aggregate answerability is authoritative. `Open` records answerability without
+using it as an execution gate.
+
+### Reranking security boundary
+
+`IRagReranker` receives the user query plus bounded candidate identities and full chunk text. Both query and chunk
+text are untrusted, and a remote reranker sends them to an external processor. Register only an approved provider,
+apply tenant/data-residency policy before retrieval, keep credentials outside source control, and never treat text
+returned or interpreted by a reranker as instructions. Reranking does not weaken the later
+`<untrusted-external-context>` prompt boundary.
+
+### Observability contract
+
+Agent Chat exposes reranking only inside a completed RAG lifecycle payload. `reranking` contains `requested`,
+`ran`, `candidateCount`, `duration`, `outcome`, `failurePolicy`, aggregate `answerability`, `timedOut`, optional safe
+`failureCode`, and a `candidates` array. Each candidate contains only `documentId`, `chunkId`, `originalRank`,
+`rerankRank`, `rerankRelevance`, and candidate `answerability`. Provider responses, exceptions, credentials, query
+text beyond the configured query-visibility policy, and chunk content are not part of reranking observability.
+When answerability removes context, `noContextReason` and `contextExcludedResults[].reason` are `NotAnswerable`.
+Enums are serialized by name, not numeric value.
+
+See the [Agents reranking guide](src/Runiq.AI.Agents/README.md#answerability-acceptance-criteria) and
+[RAG provider contract](src/Runiq.AI.Rag/README.md#optional-reranking-contract) for detailed failure, timeout,
+cost, provider-neutral rules, and the
+[performance and operational release criteria](src/Runiq.AI.Agents/README.md#performance-and-operational-acceptance-criteria).
+
 ## Tool Example
 
 Tools are plain C# types with strongly typed input and output:

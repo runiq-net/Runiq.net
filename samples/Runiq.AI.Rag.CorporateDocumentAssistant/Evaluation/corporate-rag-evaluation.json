@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "topK": 5,
+  "cases": [
+    {
+      "id": "annual-leave-answerable",
+      "category": "answerable",
+      "query": "How many annual leave days do employees receive?",
+      "expectedAnswerable": true,
+      "relevantDocuments": ["annual-leave-policy.md"],
+      "distractorDocuments": []
+    },
+    {
+      "id": "parental-leave-not-answerable",
+      "category": "not-answerable",
+      "query": "Parental entitlement length",
+      "expectedAnswerable": false,
+      "relevantDocuments": [],
+      "distractorDocuments": ["annual-leave-policy.md"]
+    },
+    {
+      "id": "security-incident-distractor",
+      "category": "similar-wrong-document",
+      "query": "Should I power off a compromised laptop after a security incident?",
+      "expectedAnswerable": true,
+      "relevantDocuments": ["incident-response.md"],
+      "distractorDocuments": ["information-security-policy.md"]
+    },
+    {
+      "id": "technical-identifier-cs1503",
+      "category": "technical-identifier",
+      "query": "Where is CS1503 documented?",
+      "expectedAnswerable": true,
+      "relevantDocuments": ["engineering-support-handbook.md"],
+      "distractorDocuments": []
+    },
+    {
+      "id": "technical-identifier-interface",
+      "category": "technical-identifier",
+      "query": "Which handbook section mentions IRagRetriever?",
+      "expectedAnswerable": true,
+      "relevantDocuments": ["engineering-support-handbook.md"],
+      "distractorDocuments": []
+    },
+    {
+      "id": "manager-approval-tie",
+      "category": "tie",
+      "query": "Which policies require manager approval?",
+      "expectedAnswerable": true,
+      "relevantDocuments": ["business-travel-policy.md", "expense-policy.md"],
+      "distractorDocuments": [],
+      "expectedTieDocuments": ["business-travel-policy.md", "expense-policy.md"]
+    }
+  ]
+}

@@ -89,6 +89,28 @@ Quoted input demonstrates exact-phrase lexical intent; identifier input demonstr
 
 For the uncovered question, the required-context policy returns a not-found answer without invoking the model. Agent Chat shows **No grounding context**, the structured no-context reason, and an empty selected-source list.
 
+## Product evaluation
+
+`Evaluation/corporate-rag-evaluation.json` is the versioned, credential-free validation set for this sample. It covers answerable and not-answerable questions, a semantically similar wrong-document candidate, exact technical identifiers, and an intentional manager-approval tie. `CorporateRagEvaluation` joins one observation to every case and reports context precision, Recall@K, MRR, NDCG, answerability precision/recall, wrong-answer prevention rate, and average reranking latency.
+
+Run the automated evaluation contract and smoke flow with:
+
+```powershell
+dotnet test tests/Runiq.AI.Rag.Tests --filter CorporateRagEvaluationTests
+```
+
+The smoke test uses deterministic embeddings and a deterministic chat client so it needs no credential or network access, while retaining the production directory ingestion, in-memory vector store, retrieval, acceptance, sample reranker, context budget, citation extraction, and Agent Chat response projection. One covered question must reach the model and produce a citation; one parental-leave question must be classified `NotAnswerable` and must not invoke the model.
+
+Metric interpretation:
+
+- **Context precision** measures the relevant share of context actually selected for the model, not all retrieved candidates.
+- **Recall@K**, **MRR**, and **NDCG** use the ordered document IDs at the configured `topK`; ties must retain deterministic source order.
+- **Answerability precision/recall** compare aggregate reranker answerability with `expectedAnswerable`. Candidate answerability remains diagnostic.
+- **Wrong-answer prevention rate** is the share of expected not-answerable cases for which model invocation was skipped.
+- **Reranking latency** is recorded separately from retrieval and model latency and averaged across the set.
+
+For release comparisons, run the same observations with reranking enabled and disabled and retain both reports. Compare ranking/answerability quality together with end-to-end latency; do not treat a latency improvement that reduces wrong-answer prevention as a quality-neutral win.
+
 ## How startup ingestion works
 
 The `SampleDocuments` path is resolved from `AppContext.BaseDirectory`, so behavior does not depend on the current working directory. The project copies the bundled Markdown files to the build output. During host startup the managed ingestion runtime discovers documents, chunks them, creates OpenAI embeddings, writes them to the configured store, and marks the index ready only after the operation completes. A missing directory, embedding failure, or partial failure prevents false readiness.
