@@ -16,6 +16,7 @@ import {
   getNoContextLabel,
   getRejectionReasonLabel,
 } from './ragTimeline';
+import { RerankingDetails } from './RerankingDetails';
 
 type RagSearchCardProps = {
   lifecycle: AgentChatRagLifecycle;
@@ -124,6 +125,7 @@ function RagDetails({ lifecycle }: RagSearchCardProps) {
           <Detail label="Top raw score" value={formatOptionalNumber(payload.topRawScore)} />
           <Detail label="Top relevance" value={formatOptionalNumber(payload.topNormalizedRelevance)} />
         </dl>
+        {payload.reranking && <RerankingDetails reranking={payload.reranking} />}
         <ResultList title="Selected results" emptyText="No results selected." results={payload.selectedResults} />
         <ResultList title="Rejected results" emptyText="No results rejected." results={payload.rejectedResults.map((result) => ({ ...result, reason: getRejectionReasonLabel(result.reason) }))} />
       </div>
