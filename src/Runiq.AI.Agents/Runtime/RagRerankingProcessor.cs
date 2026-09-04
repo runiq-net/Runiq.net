@@ -6,8 +6,16 @@ using Runiq.AI.Rag.Models.Search;
 
 namespace Runiq.AI.Agents.Runtime;
 
+/// <summary>Executes and validates the optional second-stage reranking pipeline.</summary>
 internal static class RagRerankingProcessor
 {
+    /// <summary>Reranks accepted retrieval results according to the configured failure policy.</summary>
+    /// <param name="query">The original retrieval query.</param>
+    /// <param name="acceptedResults">The candidates accepted by the retrieval stage.</param>
+    /// <param name="options">The configured reranking behavior.</param>
+    /// <param name="reranker">The optional reranker implementation.</param>
+    /// <param name="cancellationToken">The token used to cancel the operation.</param>
+    /// <returns>The ordered results and safe reranking metadata.</returns>
     public static async Task<RagRerankingExecution> ExecuteAsync(
         string query,
         IReadOnlyList<RagSearchResult> acceptedResults,
@@ -125,6 +133,10 @@ internal static class RagRerankingProcessor
         RagRerankCandidateResult Result);
 }
 
+/// <summary>Captures the result of a reranking stage before agent execution continues.</summary>
+/// <param name="OrderedResults">The results ordered for subsequent processing.</param>
+/// <param name="Metadata">The safe observable reranking metadata.</param>
+/// <param name="BlocksExecution">Indicates whether the configured failure policy blocks execution.</param>
 internal sealed record RagRerankingExecution(
     IReadOnlyList<RagSearchResult> OrderedResults,
     RagRerankingMetadata Metadata,

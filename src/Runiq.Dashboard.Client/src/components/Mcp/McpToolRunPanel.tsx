@@ -3,6 +3,7 @@ import { getDashboardBasePath } from '../../dashboardConfig';
 import { ToolRunView } from '../ToolRun/ToolRunView';
 import { useToolRunController } from '../ToolRun/useToolRunController';
 
+/** Renders the execution panel for an MCP tool. */
 export function McpToolRunPanel({ tool }: { tool: McpToolInfo }) {
   return <McpToolRunPanelContent key={JSON.stringify(tool)} tool={tool} />;
 }

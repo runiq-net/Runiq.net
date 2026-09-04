@@ -3,6 +3,7 @@ import { getDashboardBasePath } from '../../dashboardConfig';
 import { ToolRunView } from '../ToolRun/ToolRunView';
 import { useToolRunController } from '../ToolRun/useToolRunController';
 
+/** Renders the execution panel for a registered dashboard tool. */
 export function ToolRunPanel({ tool }: { tool: ToolMetadata }) {
   return <ToolRunPanelContent key={JSON.stringify(tool)} tool={tool} />;
 }

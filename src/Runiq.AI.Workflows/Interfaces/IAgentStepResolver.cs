@@ -1,3 +1,5 @@
+#pragma warning disable CS1591 // Legacy documentation debt is isolated to this existing API file.
+
 using Runiq.AI.Agents;
 
 namespace Runiq.AI.Workflows.Interfaces;

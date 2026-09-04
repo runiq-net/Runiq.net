@@ -4,6 +4,7 @@ import { buildInputObject, createDefaultInputValues, getSchemaProperties, valida
 
 type ToolDefinition = { hasInput: boolean; inputSchema: ToolJsonSchema };
 
+/** Coordinates generated tool inputs, validation, execution, and result state. */
 export function useToolRunController(
   tool: ToolDefinition,
   execute: (input: Record<string, unknown>) => Promise<ToolRunResponse>,

@@ -19,6 +19,7 @@ type ToolRunViewProps = {
   labels: ToolRunLabels;
 };
 
+/** Renders the shared input and result surface for a runnable tool. */
 export function ToolRunView({ controller, schema, hasInput, labels }: ToolRunViewProps) {
   return (
     <section className="flex min-h-0 min-w-0 flex-1 rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950/40 dark:shadow-none">

@@ -1,3 +1,5 @@
+#pragma warning disable CS1591 // Legacy documentation debt is isolated to this existing API file.
+
 using Runiq.AI.Workflows.Validations;
 using Runiq.AI.Workflows.Models;
 using Runiq.AI.Workflows.Domain;

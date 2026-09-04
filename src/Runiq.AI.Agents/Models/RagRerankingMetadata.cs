@@ -19,6 +19,12 @@ public enum RagRerankingOutcome
 }
 
 /// <summary>Provides safe score, rank, and answerability metadata for one reranked candidate.</summary>
+/// <param name="DocumentId">The stable document identifier.</param>
+/// <param name="ChunkId">The stable chunk identifier.</param>
+/// <param name="OriginalRank">The candidate rank before reranking.</param>
+/// <param name="RerankRank">The candidate rank after reranking.</param>
+/// <param name="RerankRelevance">The normalized relevance score assigned by the reranker.</param>
+/// <param name="Answerability">The answerability classification assigned to the candidate.</param>
 public sealed record RagRerankedCandidateMetadata(
     string DocumentId,
     string ChunkId,
