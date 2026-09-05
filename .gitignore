@@ -432,6 +432,7 @@ FodyWeavers.xsd
 *.msp
 
 **/appsettings.Development.json
+!samples/Runiq.AI.Expense/appsettings.Development.json
 **/appsettings.Local.json
 
 artifacts/

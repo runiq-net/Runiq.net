@@ -1,6 +1,6 @@
 <Solution>
   <Folder Name="/samples/">
-    <Project Path="samples/Runiq.AI.ExpenseDesk/Runiq.AI.ExpenseDesk.csproj" />
+    <Project Path="samples/Runiq.AI.Expense/Runiq.AI.Expense.csproj" />
     <Project Path="samples/Runiq.AI.DashboardSecurityRole/Runiq.AI.DashboardSecurityRole.csproj" />
     <Project Path="samples/Runiq.AI.DashboardSecurityUser/Runiq.AI.DashboardSecurityUser.csproj" />
     <Project Path="samples/Runiq.AI.Rag.CorporateDocumentAssistant/Runiq.AI.Rag.CorporateDocumentAssistant.csproj" />
