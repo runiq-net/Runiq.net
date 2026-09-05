@@ -1,6 +1,6 @@
 # Runiq.AI.Agents
 
-![NuGet Version](https://img.shields.io/nuget/vpre/Runiq.AI.Agents?label=nuget)
+![NuGet Version](https://img.shields.io/nuget/v/Runiq.AI.Agents?label=nuget)
 
 Code-first AI agents for .NET.
 
@@ -22,7 +22,7 @@ It focuses on:
 ## Install
 
 ```powershell
-dotnet add package Runiq.AI.Agents --prerelease
+dotnet add package Runiq.AI.Agents --version 1.0.0
 ```
 
 ## Create an Agent
@@ -371,9 +371,7 @@ https://runiq.net/docs
 
 ## Status
 
-Runiq AI is currently in preview.
-
-APIs may change before the first stable release.
+This package targets the Runiq AI 1.0.0 stable release.
 
 The main direction is clear:
 

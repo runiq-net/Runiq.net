@@ -1,6 +1,6 @@
 # Runiq.AI.Mcp
 
-![NuGet Version](https://img.shields.io/nuget/vpre/Runiq.AI.Mcp?label=nuget)
+![NuGet Version](https://img.shields.io/nuget/v/Runiq.AI.Mcp?label=nuget)
 
 MCP server integration for ASP.NET Core applications.
 
@@ -22,7 +22,7 @@ It focuses on:
 ## Install
 
 ```powershell
-dotnet add package Runiq.AI.Mcp --prerelease
+dotnet add package Runiq.AI.Mcp --version 1.0.0
 ```
 
 ## Quick Start
@@ -203,7 +203,7 @@ Use `Runiq.AI.Mcp` when you want to:
 
 ## Current Scope
 
-The current preview focuses on MCP tools.
+The current release focuses on MCP tools.
 
 Planned areas:
 
@@ -231,9 +231,7 @@ https://runiq.net/docs
 
 ## Status
 
-Runiq AI is currently in preview.
-
-APIs may change before the first stable release.
+This package targets the Runiq AI 1.0.0 stable release.
 
 The main direction is clear:
 

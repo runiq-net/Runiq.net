@@ -3,14 +3,14 @@
 [![CI](https://github.com/runiq-net/Runiq.AI/actions/workflows/ci.yml/badge.svg)](https://github.com/runiq-net/Runiq.AI/actions/workflows/ci.yml)
 ![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/runiq-net/Runiq.AI/main/badges/tests.json)
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)
-![NuGet Version](https://img.shields.io/nuget/vpre/Runiq.AI.Core?label=nuget)
+![NuGet Version](https://img.shields.io/nuget/v/Runiq.AI.Core?label=nuget)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 Runiq AI is a code-first agent runtime for .NET applications.
 
 It gives ASP.NET Core teams a native way to define AI agents in C#, attach strongly typed tools, stream model responses, use RAG retrieval, orchestrate workflows, and inspect runtime activity through an embedded dashboard.
 
-> Preview package: APIs may evolve before the first stable release.
+> Package version: 1.0.0 (stable).
 
 ## Packages
 
@@ -27,12 +27,31 @@ It gives ASP.NET Core teams a native way to define AI agents in C#, attach stron
 Install the packages you need:
 
 ```powershell
-dotnet add package Runiq.AI.Core --prerelease
-dotnet add package Runiq.AI.Agents --prerelease
-dotnet add package Runiq.AI.Workflows --prerelease
+dotnet add package Runiq.AI.Core --version 1.0.0
+dotnet add package Runiq.AI.Agents --version 1.0.0
+dotnet add package Runiq.AI.Workflows --version 1.0.0
 ```
 
 For most ASP.NET Core applications, start with `Runiq.AI.Core`; it references the runtime pieces needed to host agents and the dashboard.
+
+## Building local NuGet packages
+
+Run from the repository root with the .NET 10 SDK:
+
+```powershell
+dotnet build Runiq.AI.slnx -c Release
+dotnet test Runiq.AI.slnx --no-build -c Release
+dotnet pack Runiq.AI.slnx --no-build -c Release -o artifacts/packages/1.0.0
+```
+
+The packages use version `1.0.0`. The `.nupkg` files are written to
+`artifacts/packages/1.0.0/`, which is already excluded
+by `.gitignore`. These commands only create local packages; they do not publish
+to NuGet.org. The CI workflow writes packages to `artifacts/packages/`.
+
+Packaging currently reports `NU5104` because `Runiq.AI.Rag` depends on
+`UglyToad.PdfPig` version `1.7.0-custom-5`, a prerelease dependency. This does
+not prevent local package generation.
 
 ## Quickstart
 

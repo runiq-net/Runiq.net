@@ -1,6 +1,6 @@
 # Runiq.AI.Core
 
-![NuGet Version](https://img.shields.io/nuget/vpre/Runiq.AI.Core?label=nuget)
+![NuGet Version](https://img.shields.io/nuget/v/Runiq.AI.Core?label=nuget)
 
 Embedded ASP.NET Core runtime and dashboard hosting layer for Runiq AI.
 
@@ -24,7 +24,7 @@ It focuses on:
 ## Install
 
 ```powershell
-dotnet add package Runiq.AI.Core --prerelease
+dotnet add package Runiq.AI.Core --version 1.0.0
 ```
 
 ## Quick Start
@@ -168,9 +168,7 @@ https://runiq.net/docs
 
 ## Status
 
-Runiq AI is currently in preview.
-
-APIs may change before the first stable release.
+This package targets the Runiq AI 1.0.0 stable release.
 
 The main direction is clear:
 

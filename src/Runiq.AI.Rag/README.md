@@ -69,7 +69,7 @@ in the [Agents package guide](../Runiq.AI.Agents/README.md#rag-execution-and-gro
 ## Installation
 
 ```powershell
-dotnet add package Runiq.AI.Rag --prerelease
+dotnet add package Runiq.AI.Rag --version 1.0.0
 ```
 
 ## Named index ingestion strategies

@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>runiq</ToolCommandName>
-    <Version>1.0.2</Version>
+    <Version>1.0.0</Version>
     <PackageOutputPath>./nupkg</PackageOutputPath>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Runiq.AI.Cli</PackageId>

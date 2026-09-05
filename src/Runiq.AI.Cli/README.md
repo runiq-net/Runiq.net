@@ -7,13 +7,13 @@ Runiq CLI creates ready-to-run ASP.NET Core projects for Runiq AI. It sets up a 
 Install the CLI as a .NET tool:
 
 ```powershell
-dotnet tool install --global Runiq.AI.Cli --prerelease
+dotnet tool install --global Runiq.AI.Cli --version 1.0.0
 ```
 
 Update an existing installation:
 
 ```powershell
-dotnet tool update --global Runiq.AI.Cli --prerelease
+dotnet tool update --global Runiq.AI.Cli --version 1.0.0
 ```
 
 Verify the command is available:
