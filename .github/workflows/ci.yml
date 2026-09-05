@@ -18,6 +18,21 @@ jobs:
     name: Build, test and pack
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.0-pg17
+        env:
+          POSTGRES_DB: runiq_rag_dev
+          POSTGRES_USER: runiq_dev
+          POSTGRES_PASSWORD: runiq_dev_only
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U runiq_dev -d runiq_rag_dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4

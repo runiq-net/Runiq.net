@@ -15,14 +15,14 @@ public sealed class CliSampleGenerationTests
 
         new ArtifactGenerator(fileSystem).Generate(definition);
 
-        Assert.Contains(fileSystem.Files.Keys, path => path.EndsWith("Agents\\WeatherAgent.cs", StringComparison.Ordinal));
-        Assert.Contains(fileSystem.Files.Keys, path => path.EndsWith("Agents\\PlacesAgent.cs", StringComparison.Ordinal));
-        Assert.Contains(fileSystem.Files.Keys, path => path.EndsWith("Agents\\PlannerAgent.cs", StringComparison.Ordinal));
-        Assert.Contains(fileSystem.Files.Keys, path => path.EndsWith("Tools\\WeatherTool.cs", StringComparison.Ordinal));
-        Assert.Contains(fileSystem.Files.Keys, path => path.EndsWith("Tools\\PlacesTool.cs", StringComparison.Ordinal));
-        Assert.Contains(fileSystem.Files.Keys, path => path.EndsWith("Tools\\MealSuggestionTool.cs", StringComparison.Ordinal));
+        Assert.Contains(fileSystem.Files.Keys, path => path.EndsWith(Path.Combine("Agents", "WeatherAgent.cs"), StringComparison.Ordinal));
+        Assert.Contains(fileSystem.Files.Keys, path => path.EndsWith(Path.Combine("Agents", "PlacesAgent.cs"), StringComparison.Ordinal));
+        Assert.Contains(fileSystem.Files.Keys, path => path.EndsWith(Path.Combine("Agents", "PlannerAgent.cs"), StringComparison.Ordinal));
+        Assert.Contains(fileSystem.Files.Keys, path => path.EndsWith(Path.Combine("Tools", "WeatherTool.cs"), StringComparison.Ordinal));
+        Assert.Contains(fileSystem.Files.Keys, path => path.EndsWith(Path.Combine("Tools", "PlacesTool.cs"), StringComparison.Ordinal));
+        Assert.Contains(fileSystem.Files.Keys, path => path.EndsWith(Path.Combine("Tools", "MealSuggestionTool.cs"), StringComparison.Ordinal));
 
-        var flow = Assert.Single(fileSystem.Files, file => file.Key.EndsWith("Flows\\TravelPlanningFlow.cs", StringComparison.Ordinal)).Value;
+        var flow = Assert.Single(fileSystem.Files, file => file.Key.EndsWith(Path.Combine("Flows", "TravelPlanningFlow.cs"), StringComparison.Ordinal)).Value;
         Assert.Contains("new Flow(", flow, StringComparison.Ordinal);
         Assert.Contains(".Step<WeatherAgent>(\"weather\")", flow, StringComparison.Ordinal);
         Assert.Contains(".Step<PlacesAgent>(\"places\")", flow, StringComparison.Ordinal);
