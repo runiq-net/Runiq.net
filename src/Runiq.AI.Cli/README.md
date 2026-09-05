@@ -1,6 +1,6 @@
 # Runiq CLI
 
-Runiq CLI creates ready-to-run ASP.NET Core projects for Runiq AI. It sets up a Visual Studio friendly solution, adds Runiq packages through NuGet, wires the generated API project, and can include a small starter sample with agents, tools, prompts, workflows, Dashboard, and MCP.
+Runiq CLI creates ready-to-run ASP.NET Core projects for Runiq AI. It sets up a Visual Studio friendly solution, adds Runiq packages through NuGet, wires the generated API project, and can include a small starter sample with agents, typed tools, a real Runiq workflow, Dashboard, and MCP.
 
 ## Installation
 
@@ -69,8 +69,7 @@ Sample04/
       Program.cs
       Agents/
       Tools/
-      Prompts/
-      Workflows/
+      Flows/
       Mcp/
   tests/
 ```
@@ -104,33 +103,32 @@ The CLI prints the detected Dashboard and MCP URLs when the generated launch set
 
 ## Starter Sample
 
-When starter sample code is enabled, the generated project includes a compact Travel Assistant scenario.
+When starter sample code is enabled, the generated project includes a compact version of the repository's `Runiq.AI.WorkflowTravelPlanner` scenario.
 
 Try this in the Dashboard:
 
 ```text
-Can you suggest a 2-day trip plan in Istanbul for 3 people?
+Create a practical one-day historical trip plan in Istanbul for two people. Keep it easy to walk.
 ```
 
 The sample includes:
 
-- `TravelPlannerAgent`
-- `BudgetAdvisorAgent`
+- `WeatherAgent`
+- `PlacesAgent`
+- `PlannerAgent`
 - `WeatherTool`
-- `TripCostTool`
-- `travel-planner.md`
-- `budget-advisor.md`
-- `IstanbulTripWorkflow.cs`
+- `PlacesTool`
+- `MealSuggestionTool`
+- `TravelPlanningFlow.cs`
 - `Mcp/README.md` when MCP is enabled
 
 The conceptual flow is:
 
 ```text
-TravelPlannerAgent
-  -> WeatherTool
-  -> BudgetAdvisorAgent
-  -> TripCostTool
-  -> final suggestion
+WeatherAgent + WeatherTool
+  -> PlacesAgent + PlacesTool
+  -> PlannerAgent + MealSuggestionTool
+  -> final itinerary
 ```
 
 The sample is intentionally small. It is meant to show where agents, tools, prompts, and workflows belong without adding large datasets or complex business logic.
@@ -143,16 +141,10 @@ The sample is intentionally small. It is meant to show where agents, tools, prom
 Istanbul weather is mild and partly cloudy, around 18 C.
 ```
 
-`TripCostTool` estimates a starter trip cost:
+`PlacesTool` returns a small deterministic set of walkable places, while `MealSuggestionTool` keeps meal stops close to the route.
 
 ```text
-peopleCount * days * 75 USD
-```
-
-For 3 people over 2 days, the estimate is:
-
-```text
-450 USD
+Sultanahmet Square -> Gulhane Park -> Karakoy
 ```
 
 ## MCP
@@ -162,7 +154,8 @@ When MCP is enabled, the generated project references `Runiq.AI.Mcp`, registers 
 The starter tools include MCP metadata for:
 
 - `weather.get`
-- `trip.cost.estimate`
+- `places.get`
+- `meal.suggest`
 
 The generated `Mcp/README.md` explains the intended MCP tool examples.
 
@@ -173,19 +166,19 @@ The generated project README is user-facing. It gives prompt examples instead of
 Example prompts:
 
 ```text
-Can you suggest a 2-day trip plan in Istanbul for 3 people?
+Create a practical one-day historical trip plan in Istanbul for two people. Keep it easy to walk.
 ```
 
 ```text
-What is the weather like in Istanbul for this sample trip?
+Plan the same trip for Izmir and account for the weather.
 ```
 
 ```text
-Estimate the trip cost for 3 people over 2 days.
+Which agents and tools contributed to the result?
 ```
 
 ```text
-Create a short Istanbul itinerary and include a simple budget estimate.
+Show the workflow trace for the Istanbul plan.
 ```
 
 ## Notes
@@ -193,7 +186,7 @@ Create a short Istanbul itinerary and include a simple budget estimate.
 - The CLI currently provides the `init` command.
 - The wizard is interactive.
 - Generated projects are intended to run immediately after creation.
-- Starter workflow output is a compile-safe C# outline, not a YAML file.
+- Starter workflow output is a registered `Runiq.AI.Workflows` flow, matching the repository sample architecture.
 - The starter sample does not create helper, utility, service, CRM, order, or customer examples.
 
 ## Related Packages
@@ -201,6 +194,5 @@ Create a short Istanbul itinerary and include a simple budget estimate.
 Runiq AI is modular. Generated projects may use:
 
 - `Runiq.AI.Core`
+- `Runiq.AI.Workflows`
 - `Runiq.AI.Mcp`
-
-Future project templates can add other Runiq packages as the generated scenario grows.

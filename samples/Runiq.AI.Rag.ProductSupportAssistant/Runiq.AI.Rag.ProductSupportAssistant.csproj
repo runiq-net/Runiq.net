@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Runiq.AI.Core\Runiq.AI.Core.csproj" />
+    <ProjectReference Include="..\..\src\Runiq.AI.Agents\Runiq.AI.Agents.csproj" />
+    <ProjectReference Include="..\..\src\Runiq.AI.Rag\Runiq.AI.Rag.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="SampleDocuments\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>ProductSupportDocuments\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
+    </None>
+  </ItemGroup>
+
+</Project>

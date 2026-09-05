@@ -112,6 +112,49 @@ public sealed class OpenAIResponsesClientTests
         Assert.Equal("echo", document.RootElement.GetProperty("tools")[0].GetProperty("name").GetString());
     }
 
+    // Verifies that GPT-4.1 requests omit model controls that the non-reasoning model rejects.
+    [Fact]
+    public async Task CompleteAsync_ShouldOmitModelControls_WhenModelDoesNotSupportThem()
+    {
+        var handler = new CapturingHandler("{\"id\":\"resp_1\",\"output_text\":\"ok\"}", "application/json");
+        var request = CreateRequest() with
+        {
+            Model = ModelReference.Parse("openai/gpt-4.1-mini"),
+            Options = new ChatRequestOptions
+            {
+                ReasoningEffort = "minimal",
+                Verbosity = "low"
+            }
+        };
+
+        await new OpenAIResponsesClient(new HttpClient(handler)).CompleteAsync(request);
+
+        using var document = JsonDocument.Parse(handler.RequestBodies.Single());
+        Assert.False(document.RootElement.TryGetProperty("reasoning", out _));
+        Assert.False(document.RootElement.TryGetProperty("text", out _));
+    }
+
+    // Verifies that GPT-5 requests retain supported reasoning and verbosity controls.
+    [Fact]
+    public async Task CompleteAsync_ShouldIncludeModelControls_WhenModelSupportsThem()
+    {
+        var handler = new CapturingHandler("{\"id\":\"resp_1\",\"output_text\":\"ok\"}", "application/json");
+        var request = CreateRequest() with
+        {
+            Options = new ChatRequestOptions
+            {
+                ReasoningEffort = "minimal",
+                Verbosity = "low"
+            }
+        };
+
+        await new OpenAIResponsesClient(new HttpClient(handler)).CompleteAsync(request);
+
+        using var document = JsonDocument.Parse(handler.RequestBodies.Single());
+        Assert.Equal("minimal", document.RootElement.GetProperty("reasoning").GetProperty("effort").GetString());
+        Assert.Equal("low", document.RootElement.GetProperty("text").GetProperty("verbosity").GetString());
+    }
+
     // Verifies that HTTP status failures use the shared provider error contract.
     [Fact]
     public async Task CompleteAsync_ShouldMapHttpError()

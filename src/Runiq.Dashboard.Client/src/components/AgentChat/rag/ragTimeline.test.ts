@@ -48,11 +48,40 @@ test('completed event updates the matching lifecycle', () => {
     assert.equal(result[0].payload.acceptedCount, 2);
     assert.equal(result[0].payload.rejectedCount, 1);
     assert.deepEqual(result[0].payload.selectedResults, [
-      { documentId: 'document-1', chunkId: 'chunk-1' },
-      { documentId: 'document-2', chunkId: 'chunk-2' },
+      { documentId: 'document-1', chunkId: 'chunk-1', contextOrder: 0 },
+      { documentId: 'document-2', chunkId: 'chunk-2', contextOrder: 1 },
     ]);
     assert.equal(result[0].payload.rejectedResults[0]?.reason, 'DuplicateContent');
   }
+});
+
+// Verifies the runtime's disabled-reranking payload remains a valid completed lifecycle when its failure code is null.
+test('completed event accepts a null reranking failure code', () => {
+  const started = applyRagStreamEvent([], startedEvent('retrieval-1'));
+  const completed = completedEvent('retrieval-1');
+  const parsed = parseStreamEventPayload(JSON.stringify({
+    ...completed,
+    ragSearch: {
+      ...completed.ragSearch,
+      reranking: {
+        requested: false,
+        ran: false,
+        candidateCount: 0,
+        duration: '00:00:00',
+        outcome: 'Disabled',
+        failurePolicy: 'UseOriginalOrder',
+        answerability: 'Unknown',
+        candidates: [],
+        timedOut: false,
+        failureCode: null,
+      },
+    },
+  }));
+
+  assert.ok(parsed);
+  const result = applyRagStreamEvent(started, parsed);
+  assert.equal(result.length, 1);
+  assert.equal(result[0]?.status, 'completed');
 });
 
 // Verifies a failed event replaces the matching started lifecycle with classification but no diagnostic fields.
@@ -254,8 +283,8 @@ function completedEvent(correlationId: string): AgentChatStreamEvent {
       topNormalizedRelevance: 0.95,
       duration: '00:00:00.1250000',
       selectedResults: [
-        { documentId: 'document-1', chunkId: 'chunk-1' },
-        { documentId: 'document-2', chunkId: 'chunk-2' },
+        { documentId: 'document-1', chunkId: 'chunk-1', contextOrder: 0 },
+        { documentId: 'document-2', chunkId: 'chunk-2', contextOrder: 1 },
       ],
       rejectedResults: [
         { documentId: 'document-1', chunkId: 'chunk-duplicate', reason: 'DuplicateContent' },

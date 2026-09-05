@@ -315,7 +315,7 @@ function hasOptionalFiniteNumber(value: Record<string, unknown>, key: string): b
 }
 
 function hasOptionalString(value: Record<string, unknown>, key: string): boolean {
-  return value[key] === undefined || typeof value[key] === 'string';
+  return value[key] === undefined || value[key] === null || typeof value[key] === 'string';
 }
 
 function hasOptionalBoolean(value: Record<string, unknown>, key: string): boolean {

@@ -212,7 +212,7 @@ public sealed class OpenAIResponsesClient : IChatClient
                 system,
                 CreateInput(request.Messages),
                 stream,
-                string.IsNullOrWhiteSpace(request.Options?.ReasoningEffort) ? null : new ReasoningOptions(request.Options.ReasoningEffort),
+                CreateReasoningOptions(request),
                 CreateTextOptions(request),
                 request.Tools?.Select(MapTool).ToArray(),
                 previousResponseId),
@@ -238,9 +238,32 @@ public sealed class OpenAIResponsesClient : IChatClient
         ResponseFormat? format = request.ResponseFormat is null
             ? null
             : new ResponseFormat("json_schema", request.ResponseFormat.Name, ParseSchema(request.ResponseFormat.JsonSchema), true);
-        return format is null && string.IsNullOrWhiteSpace(request.Options?.Verbosity)
+        var verbosity = SupportsModelControls(request.Model.ModelName)
+            ? request.Options?.Verbosity
+            : null;
+        return format is null && string.IsNullOrWhiteSpace(verbosity)
             ? null
-            : new TextOptions(request.Options?.Verbosity, format);
+            : new TextOptions(verbosity, format);
+    }
+
+    private static ReasoningOptions? CreateReasoningOptions(ChatRequest request)
+    {
+        var effort = request.Options?.ReasoningEffort;
+        return SupportsModelControls(request.Model.ModelName) && !string.IsNullOrWhiteSpace(effort)
+            ? new ReasoningOptions(effort)
+            : null;
+    }
+
+    private static bool SupportsModelControls(string modelName)
+    {
+        if (modelName.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return modelName.Length > 1 &&
+            (modelName[0] is 'o' or 'O') &&
+            char.IsDigit(modelName[1]);
     }
 
     private static JsonElement ParseSchema(string schema)

@@ -433,6 +433,7 @@ FodyWeavers.xsd
 
 **/appsettings.Development.json
 !samples/Runiq.AI.Expense/appsettings.Development.json
+!samples/Runiq.AI.Rag.ProductSupportAssistant/appsettings.Development.json
 **/appsettings.Local.json
 
 artifacts/

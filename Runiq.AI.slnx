@@ -3,9 +3,7 @@
     <Project Path="samples/Runiq.AI.Expense/Runiq.AI.Expense.csproj" />
     <Project Path="samples/Runiq.AI.DashboardSecurityRole/Runiq.AI.DashboardSecurityRole.csproj" />
     <Project Path="samples/Runiq.AI.DashboardSecurityUser/Runiq.AI.DashboardSecurityUser.csproj" />
-    <Project Path="samples/Runiq.AI.Rag.CorporateDocumentAssistant/Runiq.AI.Rag.CorporateDocumentAssistant.csproj" />
-    <Project Path="samples/Runiq.AI.Rag.IngestionSample/Runiq.AI.Rag.IngestionSample.csproj" />
-    <Project Path="samples/Runiq.AI.Rag.UpsertPipelineSample/Runiq.AI.Rag.UpsertPipelineSample.csproj" />
+    <Project Path="samples/Runiq.AI.Rag.ProductSupportAssistant/Runiq.AI.Rag.ProductSupportAssistant.csproj" />
     <Project Path="samples/Runiq.AI.WorkflowTravelPlanner/Runiq.AI.WorkflowTravelPlanner.csproj" />
   </Folder>
   <Folder Name="/src/">

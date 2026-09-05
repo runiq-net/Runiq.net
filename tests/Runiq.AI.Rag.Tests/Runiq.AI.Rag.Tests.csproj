@@ -22,9 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\samples\Runiq.AI.Rag.IngestionSample\Runiq.AI.Rag.IngestionSample.csproj" />
-    <ProjectReference Include="..\..\samples\Runiq.AI.Rag.CorporateDocumentAssistant\Runiq.AI.Rag.CorporateDocumentAssistant.csproj" />
-    <ProjectReference Include="..\..\samples\Runiq.AI.Rag.UpsertPipelineSample\Runiq.AI.Rag.UpsertPipelineSample.csproj" />
+    <ProjectReference Include="..\..\samples\Runiq.AI.Rag.ProductSupportAssistant\Runiq.AI.Rag.ProductSupportAssistant.csproj" />
     <ProjectReference Include="..\..\src\Runiq.AI.Rag\Runiq.AI.Rag.csproj" />
   </ItemGroup>
 

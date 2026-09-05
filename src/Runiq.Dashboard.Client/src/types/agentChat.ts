@@ -100,7 +100,7 @@ export type AgentChatRagRerankingMetadata = {
   answerability: AgentChatRagAnswerability;
   candidates: AgentChatRagRerankedCandidate[];
   timedOut: boolean;
-  failureCode?: string;
+  failureCode?: string | null;
 };
 
 export type AgentChatRagFailureClassification =

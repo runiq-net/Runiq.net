@@ -15,8 +15,7 @@ public sealed class ProjectPlanner
             new() { Path = apiProjectRoot },
             new() { Path = Path.Combine(apiProjectRoot, "Agents") },
             new() { Path = Path.Combine(apiProjectRoot, "Tools") },
-            new() { Path = Path.Combine(apiProjectRoot, "Prompts") },
-            new() { Path = Path.Combine(apiProjectRoot, "Workflows") },
+            new() { Path = Path.Combine(apiProjectRoot, "Flows") },
             new() { Path = Path.Combine(root, "tests") }
         };
 
@@ -43,21 +42,21 @@ public sealed class ProjectPlanner
                     Open the Runiq Dashboard and try:
 
                     ```text
-                    Can you suggest a 2-day trip plan in Istanbul for 3 people?
+                    Create a practical one-day historical trip plan in Istanbul for two people. Keep it easy to walk.
                     ```
 
                     More examples:
 
                     ```text
-                    What is the weather like in Istanbul for this sample trip?
+                    Plan the same trip for Izmir and account for the weather.
                     ```
 
                     ```text
-                    Estimate the trip cost for 3 people over 2 days.
+                    Which agents and tools contributed to the result?
                     ```
 
                     ```text
-                    Create a short Istanbul itinerary and include a simple budget estimate.
+                    Show the workflow trace for the Istanbul plan.
                     ```
                     """
                 }

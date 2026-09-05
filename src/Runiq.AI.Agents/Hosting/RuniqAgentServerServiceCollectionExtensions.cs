@@ -19,6 +19,7 @@ using Runiq.AI.Rag.Abstractions.Observability;
 using Runiq.AI.Rag.Configuration;
 using Runiq.AI.Rag.Abstractions.Retrieval;
 using Runiq.AI.Rag.Runtime;
+using Runiq.AI.Rag.DependencyInjection;
 
 namespace Runiq.AI.Core;
 
@@ -55,10 +56,58 @@ public static class RuniqAgentServerServiceCollectionExtensions
             services.AddSingleton(agent);
         }
 
+        RegisterOpenAiRagEmbeddingClients(services, options.Agents);
+
         services.AddRuniqServer();
         services.AddRuniqAgentServer();
 
         return services;
+    }
+
+    private static void RegisterOpenAiRagEmbeddingClients(
+        IServiceCollection services,
+        IReadOnlyList<Agent> agents)
+    {
+        var registry = services
+            .LastOrDefault(descriptor => descriptor.ServiceType == typeof(IRagIndexRegistry))?
+            .ImplementationInstance as IRagIndexRegistry;
+        if (registry is null)
+        {
+            return;
+        }
+
+        var registrations = agents
+            .Where(agent => agent.Rag is not null &&
+                string.Equals(agent.ProviderName, "openai", StringComparison.OrdinalIgnoreCase))
+            .Select(agent => new
+            {
+                Agent = agent,
+                Index = registry.Registrations.SingleOrDefault(index =>
+                    string.Equals(index.Name, agent.Rag!.IndexName, StringComparison.Ordinal))
+            })
+            .Where(item => item.Index is not null &&
+                item.Index.EmbeddingReference.StartsWith("openai/", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (registrations.Length == 0)
+        {
+            return;
+        }
+
+        services.AddHttpClient(OpenAIEmbeddingClient.HttpClientName, client =>
+        {
+            client.BaseAddress = new Uri("https://api.openai.com/v1/");
+            client.Timeout = TimeSpan.FromMinutes(2);
+        });
+
+        foreach (var registration in registrations)
+        {
+            services.AddRagEmbeddingClient(
+                registration.Index!.EmbeddingReference,
+                provider => new OpenAIEmbeddingClient(
+                    provider.GetRequiredService<IHttpClientFactory>()
+                        .CreateClient(OpenAIEmbeddingClient.HttpClientName),
+                    registration.Agent.ApiKey));
+        }
     }
 
     /// <summary>

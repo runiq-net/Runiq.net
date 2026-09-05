@@ -30,7 +30,9 @@ public sealed class RagIngestionHostedServiceTests
         Assert.Equal(RagIngestionOperationReason.BackgroundStartup, running.ActiveOperation?.Reason);
         service.Release.TrySetResult();
         await service.Completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.Equal(RagIndexReadiness.Ready, provider.GetRequiredService<IRagIngestionManager>().GetStatus("documents").Readiness);
+        var manager = provider.GetRequiredService<IRagIngestionManager>();
+        await WaitForReadinessAsync(manager, RagIndexReadiness.Ready);
+        Assert.Equal(RagIndexReadiness.Ready, manager.GetStatus("documents").Readiness);
         await hosted.StopAsync(CancellationToken.None);
     }
 
@@ -95,6 +97,15 @@ public sealed class RagIngestionHostedServiceTests
             .ConfigureIngestion(ingestion => ingestion.BackgroundOnStartup())));
         services.Replace(ServiceDescriptor.Scoped<IRagService>(_ => service));
         return services.BuildServiceProvider();
+    }
+
+    private static async Task WaitForReadinessAsync(
+        IRagIngestionManager manager,
+        RagIndexReadiness expected)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        while (manager.GetStatus("documents").Readiness != expected)
+            await Task.Delay(10, timeout.Token);
     }
 
     private sealed class TestSource : IRagDocumentSource

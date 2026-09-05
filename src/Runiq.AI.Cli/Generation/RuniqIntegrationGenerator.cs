@@ -70,6 +70,19 @@ public sealed class RuniqIntegrationGenerator
             ],
             Directory.GetCurrentDirectory());
 
+        if (definition.IncludeSampleCode)
+        {
+            RunDotNet(
+                [
+                    "add",
+                    apiProjectPath,
+                    "package",
+                    RuniqPackageNames.Workflows,
+                    "--prerelease"
+                ],
+                Directory.GetCurrentDirectory());
+        }
+
         if (definition.EnableMcp)
         {
             RunDotNet(
@@ -175,7 +188,9 @@ public sealed class RuniqIntegrationGenerator
         if (definition.IncludeSampleCode)
         {
             usingStatements.Add($"using {definition.Name}.Api.Agents;");
+            usingStatements.Add($"using {definition.Name}.Api.Flows;");
             usingStatements.Add($"using {definition.Name}.Api.Tools;");
+            usingStatements.Add("using Runiq.AI.Workflows;");
         }
 
         if (definition.EnableMcp)
@@ -193,10 +208,17 @@ public sealed class RuniqIntegrationGenerator
               {
                   var openAiApiKey = builder.Configuration["OpenAI:ApiKey"];
 
-                  options.AddAgent(TravelPlannerAgent.Create(openAiApiKey));
-                  options.AddAgent(BudgetAdvisorAgent.Create(openAiApiKey));
+                  options.AddAgent(WeatherAgent.Create(openAiApiKey));
+                  options.AddAgent(PlacesAgent.Create(openAiApiKey));
+                  options.AddAgent(PlannerAgent.Create(openAiApiKey));
                   options.AddTool<WeatherTool>();
-                  options.AddTool<TripCostTool>();
+                  options.AddTool<PlacesTool>();
+                  options.AddTool<MealSuggestionTool>();
+              });
+
+              builder.Services.AddRuniqWorkflows(options =>
+              {
+                  options.AddFlow(TravelPlanningFlow.Create());
               });
               """
             : """

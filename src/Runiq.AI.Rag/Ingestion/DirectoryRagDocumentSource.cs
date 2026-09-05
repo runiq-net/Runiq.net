@@ -91,5 +91,9 @@ public sealed class DirectoryRagDocumentSource : IRagDocumentSource
     }
 
     private static string GetContentType(string path) => Path.GetExtension(path).ToLowerInvariant() switch { ".md" or ".markdown" => "text/markdown", ".json" => "application/json", ".pdf" => "application/pdf", _ => "text/plain" };
-    private static string ExtractPdfText(string path) { using var pdf = PdfDocument.Open(path); return string.Join("\f", pdf.GetPages().Select(page => page.Text)); }
+    private static string ExtractPdfText(string path)
+    {
+        using var pdf = PdfDocument.Open(path);
+        return string.Join("\f", pdf.GetPages().Select(page => string.Join(' ', page.GetWords().Select(word => word.Text))));
+    }
 }

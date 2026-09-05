@@ -1,4 +1,11 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Abstractions;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Runiq.AI.Core.Agents;
 
 namespace Runiq.AI.Core.Tests.Agents;
@@ -39,6 +46,28 @@ public sealed class AgentChatRequestValidationTests
         var errors = Validate(request);
 
         Assert.Contains(errors, error => error.MemberNames.Contains(nameof(AgentChatRequest.IndexName)));
+    }
+
+    // Verifies ASP.NET Core MVC can validate the request without rejecting record property metadata at runtime.
+    [Fact]
+    public void MvcValidation_WhenRequestIsValid_DoesNotThrowOrAddErrors()
+    {
+        using var provider = new ServiceCollection().AddLogging().AddControllers().Services.BuildServiceProvider();
+        var httpContext = new DefaultHttpContext { RequestServices = provider };
+        var actionContext = new ActionContext(
+            httpContext,
+            new RouteData(),
+            new ActionDescriptor(),
+            new ModelStateDictionary());
+        var request = new AgentChatRequest("Hello", AgentChatResponseMode.Stream, "documents");
+
+        provider.GetRequiredService<IObjectModelValidator>().Validate(
+            actionContext,
+            validationState: null,
+            prefix: string.Empty,
+            model: request);
+
+        Assert.True(actionContext.ModelState.IsValid);
     }
 
     private static IReadOnlyList<ValidationResult> Validate(AgentChatRequest request)

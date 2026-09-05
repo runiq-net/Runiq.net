@@ -25,31 +25,31 @@ public sealed class ArtifactGenerator
             $"{definition.Name}.Api");
 
         _fileSystem.WriteAllText(
-            Path.Combine(apiProjectRoot, "Agents", "TravelPlannerAgent.cs"),
-            CreateTravelPlannerAgentContent(definition));
+            Path.Combine(apiProjectRoot, "Agents", "WeatherAgent.cs"),
+            CreateWeatherAgentContent(definition));
 
         _fileSystem.WriteAllText(
-            Path.Combine(apiProjectRoot, "Agents", "BudgetAdvisorAgent.cs"),
-            CreateBudgetAdvisorAgentContent(definition));
+            Path.Combine(apiProjectRoot, "Agents", "PlacesAgent.cs"),
+            CreatePlacesAgentContent(definition));
+
+        _fileSystem.WriteAllText(
+            Path.Combine(apiProjectRoot, "Agents", "PlannerAgent.cs"),
+            CreatePlannerAgentContent(definition));
 
         _fileSystem.WriteAllText(
             Path.Combine(apiProjectRoot, "Tools", "WeatherTool.cs"),
             CreateWeatherToolContent(definition));
 
         _fileSystem.WriteAllText(
-            Path.Combine(apiProjectRoot, "Tools", "TripCostTool.cs"),
-            CreateTripCostToolContent(definition));
+            Path.Combine(apiProjectRoot, "Tools", "PlacesTool.cs"),
+            CreatePlacesToolContent(definition));
 
         _fileSystem.WriteAllText(
-            Path.Combine(apiProjectRoot, "Prompts", "travel-planner.md"),
-            CreateTravelPlannerPromptContent(definition));
+            Path.Combine(apiProjectRoot, "Tools", "MealSuggestionTool.cs"),
+            CreateMealSuggestionToolContent(definition));
 
         _fileSystem.WriteAllText(
-            Path.Combine(apiProjectRoot, "Prompts", "budget-advisor.md"),
-            CreateBudgetAdvisorPromptContent(definition));
-
-        _fileSystem.WriteAllText(
-            Path.Combine(apiProjectRoot, "Workflows", "IstanbulTripWorkflow.cs"),
+            Path.Combine(apiProjectRoot, "Flows", "TravelPlanningFlow.cs"),
             CreateWorkflowContent(definition));
 
         if (definition.EnableMcp)
@@ -60,7 +60,7 @@ public sealed class ArtifactGenerator
         }
     }
 
-    private static string CreateTravelPlannerAgentContent(ProjectDefinition definition)
+    private static string CreateWeatherAgentContent(ProjectDefinition definition)
     {
         return $$""""
                using Runiq.AI.Agents;
@@ -69,30 +69,29 @@ public sealed class ArtifactGenerator
 
                namespace {{definition.Name}}.Api.Agents;
 
-               public static class TravelPlannerAgent
+               /// <summary>Defines the weather specialist used by the travel workflow.</summary>
+               public sealed class WeatherAgent : Agent
                {
-                   public static Agent Create(string? apiKey)
-                   {
-                       return new Agent(
-                           id: "travel-planner",
-                           name: "Travel Planner",
+                   private WeatherAgent(string? apiKey)
+                       : base(
+                           id: "weather-agent",
+                           name: "Weather Agent",
                            instructions: """
-                           You are the starter travel planning assistant.
-
-                           Prompt reference: Prompts/travel-planner.md.
-                           For the sample request, plan a 2-day Istanbul trip for 3 people.
-                           Check WeatherTool before suggesting the itinerary.
-                           Ask Budget Advisor for cost support before the final suggestion.
+                           Analyze weather and travel comfort. Always use WeatherTool and return a concise contribution for the next workflow step.
+                           Answer in the same language as the user. Do not create the final itinerary.
                            """,
                            model: "openai/gpt-5",
                            apiKey: apiKey)
-                           .AddTool<WeatherTool>();
+                   {
                    }
+
+                   /// <summary>Creates the weather agent with its typed tool.</summary>
+                   public static Agent Create(string? apiKey) => new WeatherAgent(apiKey).AddTool<WeatherTool>();
                }
                """";
     }
 
-    private static string CreateBudgetAdvisorAgentContent(ProjectDefinition definition)
+    private static string CreatePlacesAgentContent(ProjectDefinition definition)
     {
         return $$""""
                using Runiq.AI.Agents;
@@ -101,24 +100,56 @@ public sealed class ArtifactGenerator
 
                namespace {{definition.Name}}.Api.Agents;
 
-               public static class BudgetAdvisorAgent
+               /// <summary>Defines the places specialist used by the travel workflow.</summary>
+               public sealed class PlacesAgent : Agent
                {
-                   public static Agent Create(string? apiKey)
-                   {
-                       return new Agent(
-                           id: "budget-advisor",
-                           name: "Budget Advisor",
+                   private PlacesAgent(string? apiKey)
+                       : base(
+                           id: "places-agent",
+                           name: "Places Agent",
                            instructions: """
-                           You support the Travel Planner with simple trip cost estimates.
-
-                           Prompt reference: Prompts/budget-advisor.md.
-                           Use TripCostTool when the user asks for a trip budget or estimate.
-                           Keep estimates simple and clearly label them as starter sample values.
+                           Suggest practical and walkable places. Always use PlacesTool and return a concise contribution for the final planner.
+                           Use previous workflow output as context. Answer in the same language as the user. Do not create the final itinerary.
                            """,
                            model: "openai/gpt-5",
                            apiKey: apiKey)
-                           .AddTool<TripCostTool>();
+                   {
                    }
+
+                   /// <summary>Creates the places agent with its typed tool.</summary>
+                   public static Agent Create(string? apiKey) => new PlacesAgent(apiKey).AddTool<PlacesTool>();
+               }
+               """";
+    }
+
+    private static string CreatePlannerAgentContent(ProjectDefinition definition)
+    {
+        return $$""""
+               using Runiq.AI.Agents;
+               using Runiq.AI.Agents.Tools;
+               using {{definition.Name}}.Api.Tools;
+
+               namespace {{definition.Name}}.Api.Agents;
+
+               /// <summary>Defines the final planner used by the travel workflow.</summary>
+               public sealed class PlannerAgent : Agent
+               {
+                   private PlannerAgent(string? apiKey)
+                       : base(
+                           id: "planner-agent",
+                           name: "Planner Agent",
+                           instructions: """
+                           Create the final practical itinerary from the user's request and previous workflow outputs.
+                           Always use MealSuggestionTool before answering. Include weather, route flow, breaks, and meal areas.
+                           Answer in the same language as the user and do not expose raw tool output.
+                           """,
+                           model: "openai/gpt-5",
+                           apiKey: apiKey)
+                   {
+                   }
+
+                   /// <summary>Creates the planner agent with its typed tool.</summary>
+                   public static Agent Create(string? apiKey) => new PlannerAgent(apiKey).AddTool<MealSuggestionTool>();
                }
                """";
     }
@@ -175,7 +206,7 @@ public sealed class ArtifactGenerator
                """;
     }
 
-    private static string CreateTripCostToolContent(ProjectDefinition definition)
+    private static string CreatePlacesToolContent(ProjectDefinition definition)
     {
         var mcpUsingStatements = definition.EnableMcp
             ? "using System.ComponentModel;\nusing ModelContextProtocol.Server;\n"
@@ -185,15 +216,12 @@ public sealed class ArtifactGenerator
             : string.Empty;
         var mcpMethodAttributes = definition.EnableMcp
             ? """
-                  [McpServerTool(Name = "trip.cost.estimate", ReadOnly = true)]
-                  [Description("Estimates a starter sample trip cost.")]
+                  [McpServerTool(Name = "places.get", ReadOnly = true)]
+                  [Description("Gets walkable starter sample places for a city.")]
               """
             : string.Empty;
-        var peopleDescription = definition.EnableMcp
-            ? "[Description(\"Number of travelers.\")] "
-            : string.Empty;
-        var daysDescription = definition.EnableMcp
-            ? "[Description(\"Number of trip days.\")] "
+        var cityDescription = definition.EnableMcp
+            ? "[Description(\"The city to explore.\")] "
             : string.Empty;
 
         return $$"""
@@ -202,104 +230,107 @@ public sealed class ArtifactGenerator
                namespace {{definition.Name}}.Api.Tools;
 
                [RuniqTool(
-                   name: "trip_cost_estimate",
-                   description: "Estimates a simple starter trip cost.")]
-               {{mcpTypeAttribute}}public sealed class TripCostTool : IRuniqTool<TripCostToolInput, TripCostToolOutput>
+                   name: "places",
+                   description: "Gets walkable starter sample places for a city.")]
+               {{mcpTypeAttribute}}public sealed class PlacesTool : IRuniqTool<PlacesToolInput, PlacesToolOutput>
                {
                {{mcpMethodAttributes}}
-                   public string EstimateTripCost(
-                       {{peopleDescription}}int peopleCount,
-                       {{daysDescription}}int days)
+                   public IReadOnlyList<string> GetPlaces({{cityDescription}}string city)
                    {
-                       var total = peopleCount * days * 75;
-
-                       return $"Estimated starter trip cost: {total} USD.";
+                       return city.Trim().ToUpperInvariant() switch
+                       {
+                           "ISTANBUL" => ["Sultanahmet Square", "Gulhane Park", "Karakoy"],
+                           "IZMIR" => ["Konak Square", "Kemeralti", "Kordon"],
+                           _ => ["City center", "Old town", "Main square"]
+                       };
                    }
 
-                   public Task<TripCostToolOutput> ExecuteAsync(
-                       TripCostToolInput input,
+                   public Task<PlacesToolOutput> ExecuteAsync(
+                       PlacesToolInput input,
                        CancellationToken cancellationToken = default)
                    {
-                       var total = input.PeopleCount * input.Days * 75;
-
-                       return Task.FromResult(new TripCostToolOutput(
-                           PeopleCount: input.PeopleCount,
-                           Days: input.Days,
-                           EstimatedTotalUsd: total,
-                           Summary: EstimateTripCost(input.PeopleCount, input.Days)));
+                       return Task.FromResult(new PlacesToolOutput(input.City, GetPlaces(input.City)));
                    }
                }
 
-               public sealed record TripCostToolInput(
-                   int PeopleCount,
-                   int Days);
+               public sealed record PlacesToolInput(string City);
 
-               public sealed record TripCostToolOutput(
-                   int PeopleCount,
-                   int Days,
-                   int EstimatedTotalUsd,
-                   string Summary);
+               public sealed record PlacesToolOutput(string City, IReadOnlyList<string> Places);
                """;
     }
 
-    private static string CreateTravelPlannerPromptContent(ProjectDefinition definition)
+    private static string CreateMealSuggestionToolContent(ProjectDefinition definition)
     {
+        var mcpUsingStatements = definition.EnableMcp
+            ? "using System.ComponentModel;\nusing ModelContextProtocol.Server;\n"
+            : string.Empty;
+        var mcpTypeAttribute = definition.EnableMcp
+            ? "[McpServerToolType]\n"
+            : string.Empty;
+        var mcpMethodAttributes = definition.EnableMcp
+            ? """
+                  [McpServerTool(Name = "meal.suggest", ReadOnly = true)]
+                  [Description("Gets starter sample meal areas for a city.")]
+              """
+            : string.Empty;
+        var cityDescription = definition.EnableMcp
+            ? "[Description(\"The city for the meal suggestion.\")] "
+            : string.Empty;
+
         return $$"""
-               # Travel Planner Prompt
+               {{mcpUsingStatements}}using Runiq.AI.Agents.Tools;
 
-               You are the main travel planning assistant for {{definition.Name}}.
+               namespace {{definition.Name}}.Api.Tools;
 
-               Sample user request:
-               "Can you suggest a 2-day trip plan in Istanbul for 3 people?"
+               [RuniqTool(
+                   name: "meal_suggestion",
+                   description: "Gets starter sample meal areas for a city.")]
+               {{mcpTypeAttribute}}public sealed class MealSuggestionTool : IRuniqTool<MealSuggestionToolInput, MealSuggestionToolOutput>
+               {
+               {{mcpMethodAttributes}}
+                   public string GetMealAreas({{cityDescription}}string city) =>
+                       city.Trim().Equals("Istanbul", StringComparison.OrdinalIgnoreCase)
+                           ? "Lunch near Sultanahmet; dinner in Karakoy or Galata."
+                           : "Choose meal areas close to the walking route.";
 
-               Guidance:
-               - Start with the destination, duration, and group size.
-               - Check the weather before suggesting the itinerary.
-               - Keep the itinerary practical and easy to scan.
-               - Ask Budget Advisor for a simple cost estimate before the final suggestion.
-               """;
-    }
+                   public Task<MealSuggestionToolOutput> ExecuteAsync(
+                       MealSuggestionToolInput input,
+                       CancellationToken cancellationToken = default)
+                   {
+                       return Task.FromResult(new MealSuggestionToolOutput(input.City, GetMealAreas(input.City)));
+                   }
+               }
 
-    private static string CreateBudgetAdvisorPromptContent(ProjectDefinition definition)
-    {
-        return $$"""
-               # Budget Advisor Prompt
+               public sealed record MealSuggestionToolInput(string City);
 
-               You support the travel plan with simple budget guidance.
-
-               Guidance:
-               - Use the trip cost tool for estimates.
-               - The starter sample assumes 75 USD per person per day.
-               - Keep the budget explanation short.
-               - Clearly label estimates as sample values.
+               public sealed record MealSuggestionToolOutput(string City, string Suggestion);
                """;
     }
 
     private static string CreateWorkflowContent(ProjectDefinition definition)
     {
         return $$"""
-               namespace {{definition.Name}}.Api.Workflows;
+               using {{definition.Name}}.Api.Agents;
+               using Runiq.AI.Workflows.Domain;
 
-               public sealed class IstanbulTripWorkflow
+               namespace {{definition.Name}}.Api.Flows;
+
+               /// <summary>Creates the deterministic travel planning workflow.</summary>
+               public static class TravelPlanningFlow
                {
-                   public string UserRequest =>
-                       "Can you suggest a 2-day trip plan in Istanbul for 3 people?";
-
-                   public IReadOnlyList<string> Steps { get; } =
-                   [
-                       "TravelPlannerAgent receives the Istanbul trip request.",
-                       "TravelPlannerAgent calls WeatherTool.GetWeather(\"Istanbul\").",
-                       "BudgetAdvisorAgent reviews budget needs.",
-                       "BudgetAdvisorAgent calls TripCostTool.EstimateTripCost(3, 2).",
-                       "TravelPlannerAgent combines the itinerary, weather, and budget into a final suggestion."
-                   ];
-
-                   public string Describe()
-                   {
-                       // TODO: Replace this outline with a Runiq workflow registration when the
-                       // generated project opts into the workflow package and runtime wiring.
-                       return string.Join(Environment.NewLine, Steps);
-                   }
+                   /// <summary>Builds the weather-to-places-to-planner flow.</summary>
+                   public static Flow Create() => new Flow(
+                           id: "travel-planning-workflow",
+                           name: "Travel Planning Workflow")
+                       .Step<WeatherAgent>("weather")
+                           .OnSuccess("places")
+                           .OnFailureContinue("places")
+                       .Step<PlacesAgent>("places")
+                           .OnSuccess("planner")
+                           .OnFailureContinue("planner")
+                       .Step<PlannerAgent>("planner")
+                           .OnFailureStop()
+                       .Build();
                }
                """;
     }
@@ -314,12 +345,14 @@ public sealed class ArtifactGenerator
                The starter travel tools include MCP metadata and can be exposed as:
 
                - `weather.get`
-               - `trip.cost.estimate`
+               - `places.get`
+               - `meal.suggest`
 
                They mirror the same small sample capabilities used by the generated agents:
 
                - `WeatherTool.GetWeather("Istanbul")`
-               - `TripCostTool.EstimateTripCost(3, 2)`
+               - `PlacesTool.GetPlaces("Istanbul")`
+               - `MealSuggestionTool.GetMealAreas("Istanbul")`
                """;
     }
 }
