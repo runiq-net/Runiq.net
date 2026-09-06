@@ -13,6 +13,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-test-pack:
     name: Build, test and pack
@@ -45,6 +49,10 @@ jobs:
       - name: Restore
         run: dotnet restore Runiq.AI.slnx
 
+      - name: Verify test reporting
+        shell: pwsh
+        run: ./scripts/test-update-test-badge.ps1
+
       - name: Build
         run: dotnet build Runiq.AI.slnx --no-restore -c Release -v:minimal
 
@@ -54,24 +62,40 @@ jobs:
         run: dotnet test Runiq.AI.slnx --no-build -c Release -v:minimal --logger trx --results-directory TestResults
 
       - name: Update test badge
+        id: badge
         if: always()
         shell: pwsh
-        run: ./scripts/update-test-badge.ps1 -ResultsDirectory TestResults -OutputPath badges/tests.json
+        env:
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+        run: |
+          [xml]$solution = Get-Content Runiq.AI.slnx -Raw
+          $expected = @($solution.Solution.Folder | Where-Object Name -eq '/tests/' | ForEach-Object { $_.Project }).Count
+          ./scripts/update-test-badge.ps1 -ResultsDirectory TestResults -OutputPath badges/tests.json -TestOutcome $env:TEST_OUTCOME -ExpectedResultCount $expected -SummaryPath $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            TestResults/**/*.trx
+            badges/tests.json
+          retention-days: 14
 
       - name: Commit test badge
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: always() && !cancelled() && steps.badge.outcome == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           # Badge updates only push from main so pull request builds validate the JSON
           # without trying to write to contributor branches or forks.
-          if git diff --quiet -- badges/tests.json; then
+          git add badges/tests.json
+          if git diff --cached --quiet -- badges/tests.json; then
             echo "Test badge is already up to date."
             exit 0
           fi
 
-          git add badges/tests.json
           git commit -m "chore: update test badge [skip ci]"
           git push
 

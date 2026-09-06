@@ -1,246 +1,189 @@
 # Runiq AI
 
-[![CI](https://github.com/runiq-net/Runiq.AI/actions/workflows/ci.yml/badge.svg)](https://github.com/runiq-net/Runiq.AI/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/runiq-net/Runiq.AI/main/badges/tests.json)
-![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)
-![NuGet Version](https://img.shields.io/nuget/v/Runiq.AI.Core?label=nuget)
-![License](https://img.shields.io/badge/license-MIT-blue)
+**Build AI agents in C#. Run them inside your ASP.NET Core application.**
 
-Runiq AI is a code-first agent runtime for .NET applications.
+[![CI](https://github.com/runiq-net/Runiq.AI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/runiq-net/Runiq.AI/actions/workflows/ci.yml?query=branch%3Amain)
+[![.NET tests](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fruniq-net%2FRuniq.AI%2Fmain%2Fbadges%2Ftests.json)](https://github.com/runiq-net/Runiq.AI/actions/workflows/ci.yml?query=branch%3Amain)
+[![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/download/dotnet/10.0)
+[![NuGet](https://img.shields.io/nuget/v/Runiq.AI.Agents?label=NuGet)](https://www.nuget.org/packages/Runiq.AI.Agents)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-It gives ASP.NET Core teams a native way to define AI agents in C#, attach strongly typed tools, stream model responses, use RAG retrieval, orchestrate workflows, and inspect runtime activity through an embedded dashboard.
+Runiq AI is a code-first agent runtime for .NET. Define agents and strongly typed tools, stream model responses, ground answers in your documents, and orchestrate workflows using your application's hosting and dependency injection. An embedded dashboard lets you explore agents, try conversations, and inspect runtime activity.
 
-> Package version: 1.0.0 (stable).
+[Quickstart](#quickstart) · [Packages](#packages) · [Samples](#samples) · [Build and test](#build-and-test) · [Documentation](https://runiq.net/docs)
 
-## Packages
+## What you can build
 
-| Package | Purpose |
-| --- | --- |
-| `Runiq.AI.Agents` | Agent definitions, tool execution, provider integration, streaming events, and execution results. |
-| `Runiq.AI.Core` | ASP.NET Core hosting extensions, runtime endpoints, and the embedded dashboard. |
-| `Runiq.AI.Rag` | Document chunking, embeddings, vector storage, and retrieval for document-based knowledge. |
-| `Runiq.AI.Rag.PostgreSql` | Durable RAG persistence and database-side vector search with PostgreSQL and pgvector. |
-| `Runiq.AI.Workflows` | Code-first workflow orchestration primitives for agent runtime and dashboard scenarios. |
-
-## Installation
-
-Install the packages you need:
-
-```powershell
-dotnet add package Runiq.AI.Core --version 1.0.0
-dotnet add package Runiq.AI.Agents --version 1.0.0
-dotnet add package Runiq.AI.Workflows --version 1.0.0
-```
-
-For most ASP.NET Core applications, start with `Runiq.AI.Core`; it references the runtime pieces needed to host agents and the dashboard.
-
-## Building local NuGet packages
-
-Run from the repository root with the .NET 10 SDK:
-
-```powershell
-dotnet build Runiq.AI.slnx -c Release
-dotnet test Runiq.AI.slnx --no-build -c Release
-dotnet pack Runiq.AI.slnx --no-build -c Release -o artifacts/packages/1.0.0
-```
-
-The packages use version `1.0.0`. The `.nupkg` files are written to
-`artifacts/packages/1.0.0/`, which is already excluded
-by `.gitignore`. These commands only create local packages; they do not publish
-to NuGet.org. The CI workflow writes packages to `artifacts/packages/`.
-
-Packaging currently reports `NU5104` because `Runiq.AI.Rag` depends on
-`UglyToad.PdfPig` version `1.7.0-custom-5`, a prerelease dependency. This does
-not prevent local package generation.
+- **Agents with tools:** C# agent definitions, typed tool inputs and outputs, provider integration, and streaming execution.
+- **Document assistants:** ingestion, chunking, embeddings, retrieval, grounding policies, source citations, and optional reranking.
+- **Persistent knowledge stores:** PostgreSQL and pgvector integration for durable documents and vector search.
+- **Agent workflows:** code-first orchestration with runtime and dashboard integration.
+- **MCP services:** expose application capabilities to MCP-compatible clients over HTTP.
+- **Application-owned dashboards:** host the dashboard in your ASP.NET Core process with configurable authentication.
 
 ## Quickstart
 
-Register Runiq and define an agent:
+You need the .NET 10 SDK and an OpenAI API key for this example.
+
+### 1. Create an application
+
+```powershell
+dotnet new web -n MyRuniqApp
+cd MyRuniqApp
+dotnet add package Runiq.AI.Agents --version 1.0.0
+dotnet user-secrets init
+dotnet user-secrets set "OpenAI:ApiKey" "YOUR_OPENAI_API_KEY"
+```
+
+`Runiq.AI.Agents` includes the agent registration API and references `Runiq.AI.Core` and `Runiq.AI.Rag`. You do not need to install those dependencies separately for this example.
+
+### 2. Replace `Program.cs`
 
 ```csharp
 using Runiq.AI.Agents;
 using Runiq.AI.Core;
 
+var builder = WebApplication.CreateBuilder(args);
+var apiKey = builder.Configuration["OpenAI:ApiKey"]
+    ?? throw new InvalidOperationException("Configure OpenAI:ApiKey before starting the app.");
+
 builder.Services.AddRuniqServer(options =>
 {
     options.AddAgent(new Agent(
-        id: "weather-agent",
-        name: "Weather Agent",
-        instructions: "Answer weather questions using the available tools.",
+        id: "assistant",
+        name: "Assistant",
+        instructions: "You are a helpful assistant. Give clear, concise answers.",
         model: "openai/gpt-5",
-        apiKey: builder.Configuration["OpenAI:ApiKey"]));
+        apiKey: apiKey));
 });
-```
 
-Map the dashboard:
+var app = builder.Build();
 
-```csharp
 app.UseRuniqDashboard(options =>
 {
     options.Path = "/dashboard";
-    options.Title = "Runiq Dashboard";
+    options.Title = "My Runiq App";
     options.Authentication(auth =>
     {
-        // Demo or sample only. Do not use AllowAnonymous in production.
+        // Local demo only. Configure authentication before deploying.
         auth.AllowAnonymous();
     });
 });
+
+app.Run();
 ```
 
-Run the application and open `/dashboard` to inspect registered agents, test conversations, and review runtime activity.
+### 3. Run and explore
 
-## RAG Grounding Policies
-
-RAG-enabled agents can choose an explicit execution mode and no-context outcome:
-
-```csharp
-using Runiq.AI.Agents.Configuration;
-
-options.AddAgent(new Agent(
-        id: "policy-assistant",
-        name: "Policy Assistant",
-        instructions: "Answer employee policy questions.",
-        model: "openai/gpt-5",
-        apiKey: builder.Configuration["OpenAI:ApiKey"])
-    .UseRag(rag =>
-    {
-        rag.IndexName = "company-policies";
-        rag.Mode = RagExecutionMode.Grounded;
-        rag.NoContextBehavior = RagNoContextBehavior.ReturnNotFound;
-        rag.Acceptance.MinimumRelevance = 0.75;
-        rag.Acceptance.CandidateCount = 20;
-        rag.Acceptance.MaximumAcceptedResults = 5;
-    }));
+```powershell
+dotnet run --environment Development --urls http://localhost:5050
 ```
 
-The default is `Open` with `AnswerNormally`, preserving normal model behavior when retrieval succeeds without
-accepted context. `Grounded` makes documents the primary source; `Required` allows answers only from accepted
-context and must use `ReturnNotFound` or `FailExecution`. Retrieval failures remain failures in every mode.
+Open [localhost:5050/dashboard](http://localhost:5050/dashboard), select **Assistant**, and start a conversation. Model requests use your configured provider credentials.
 
-When selected context is available, the runtime assigns stable citation numbers in model-context order and validates assistant markers such as `[1]` against that execution's selected sources. Agent Chat renders validated mappings in a separate **Sources cited** section. This is distinct from grounding evidence, which continues to show all selected context and rejected candidates; citation validation confirms source identity, not sentence-level semantic entailment.
-`CandidateCount` controls how many raw matches are requested; it is not a relevance or acceptance guarantee.
-Every candidate is normalized when its metric supports a documented conversion, evaluated by the acceptance
-policy, and retained as either accepted or rejected runtime metadata before any document enters Agent Chat context.
-See the [Agents package guide](src/Runiq.AI.Agents/README.md#rag-execution-and-grounding-policies) for the complete
-policy matrix, relevance acceptance, trust boundary, and structured runtime outcome.
+For authenticated hosting, see the [user-based](samples/Runiq.AI.DashboardSecurityUser/README.md) and [role-based](samples/Runiq.AI.DashboardSecurityRole/README.md) security samples.
 
-## Production Reranking
+Prefer scaffolding? Install the [Runiq CLI](src/Runiq.AI.Cli/README.md) and run its project wizard:
 
-Reranking runs after retrieval acceptance and before context-budget selection. The supported Cohere Rerank v2
-adapter can be registered with a credential supplied by an environment variable or another secret provider:
-
-```csharp
-using Runiq.AI.Agents;
-using Runiq.AI.Agents.Configuration;
-using Runiq.AI.Agents.Providers.Cohere;
-
-builder.Services.AddCohereReranker(options =>
-{
-    options.ApiKey = builder.Configuration["COHERE_API_KEY"]
-        ?? throw new InvalidOperationException("COHERE_API_KEY is required.");
-    options.Model = "rerank-v4.0-fast";
-    options.MinimumAnswerableRelevance = 0.5;
-});
-
-builder.Services.AddRuniqServer(options =>
-{
-    options.AddAgent(new Agent(
-            id: "policy-assistant",
-            name: "Policy Assistant",
-            instructions: "Answer employee policy questions.",
-            model: "openai/gpt-5",
-            apiKey: builder.Configuration["OpenAI:ApiKey"])
-        .UseRag(rag =>
-        {
-            rag.IndexName = "company-policies";
-            rag.Mode = RagExecutionMode.Grounded;
-            rag.NoContextBehavior = RagNoContextBehavior.ReturnNotFound;
-            rag.Reranking.Enabled = true;
-            rag.Reranking.MaximumCandidates = 5;
-            rag.Reranking.Timeout = TimeSpan.FromSeconds(5);
-            rag.Reranking.FailurePolicy = RagRerankerFailurePolicy.UseOriginalOrder;
-        }));
-});
+```powershell
+dotnet tool install --global Runiq.AI.Cli --version 1.0.0
+runiq init MyRuniqApp
 ```
 
-For a successful reranker response, aggregate answerability controls execution as follows:
+## Packages
 
-| RAG mode | `Answerable` | `Unknown` | `NotAnswerable` |
-|---|---|---|---|
-| `Open` | Use reranked context | Use reranked context | Use reranked context |
-| `Grounded` | Use reranked context | Apply `NoContextBehavior` | Apply `NoContextBehavior` |
-| `Required` | Use reranked context | Apply `NoContextBehavior` | Apply `NoContextBehavior` |
+Choose packages by capability. Package guides include configuration and API examples.
 
-`Unknown` means the provider or adapter could not establish answerability. It remains distinct in observability,
-but `Grounded` and `Required` deliberately treat it like `NotAnswerable` and fail closed. Candidate-level
-answerability is diagnostic only; aggregate answerability is authoritative. `Open` records answerability without
-using it as an execution gate.
+| Package | Purpose | Guide |
+| --- | --- | --- |
+| `Runiq.AI.Agents` | Agent definitions, typed tools, providers, streaming, and execution results | [Agents](src/Runiq.AI.Agents/README.md) |
+| `Runiq.AI.Core` | Shared contracts, ASP.NET Core hosting, runtime endpoints, and embedded dashboard | [Core](src/Runiq.AI.Core/README.md) |
+| `Runiq.AI.Rag` | Document ingestion, chunking, embeddings, vector storage, and retrieval | [RAG](src/Runiq.AI.Rag/README.md) |
+| `Runiq.AI.Rag.PostgreSql` | PostgreSQL persistence and pgvector search | [PostgreSQL](src/Runiq.AI.Rag.PostgreSql/README.md) |
+| `Runiq.AI.Workflows` | Code-first workflow definitions and execution | [Workflows](src/Runiq.AI.Workflows/README.md) |
+| `Runiq.AI.Mcp` | MCP server integration and application tools | [MCP](src/Runiq.AI.Mcp/README.md) |
+| `Runiq.AI.Cli` | .NET tool for scaffolding applications | [CLI](src/Runiq.AI.Cli/README.md) |
 
-### Reranking security boundary
+## Ground answers in your documents
 
-`IRagReranker` receives the user query plus bounded candidate identities and full chunk text. Both query and chunk
-text are untrusted, and a remote reranker sends them to an external processor. Register only an approved provider,
-apply tenant/data-residency policy before retrieval, keep credentials outside source control, and never treat text
-returned or interpreted by a reranker as instructions. Reranking does not weaken the later
-`<untrusted-external-context>` prompt boundary.
+RAG agents support three execution modes: `Open`, `Grounded`, and `Required`. Configure what happens when no acceptable context is found, apply relevance thresholds, and optionally rerank accepted candidates before selecting context.
 
-### Observability contract
+- [Grounding policies and relevance acceptance](src/Runiq.AI.Agents/README.md#rag-execution-and-grounding-policies)
+- [Cohere reranking configuration](src/Runiq.AI.Agents/README.md#cohere-production-reranker)
+- [Answerability and failure behavior](src/Runiq.AI.Agents/README.md#answerability-acceptance-criteria)
+- [Provider-neutral reranking contract](src/Runiq.AI.Rag/README.md#optional-reranking-contract)
 
-Agent Chat exposes reranking only inside a completed RAG lifecycle payload. `reranking` contains `requested`,
-`ran`, `candidateCount`, `duration`, `outcome`, `failurePolicy`, aggregate `answerability`, `timedOut`, optional safe
-`failureCode`, and a `candidates` array. Each candidate contains only `documentId`, `chunkId`, `originalRank`,
-`rerankRank`, `rerankRelevance`, and candidate `answerability`. Provider responses, exceptions, credentials, query
-text beyond the configured query-visibility policy, and chunk content are not part of reranking observability.
-When answerability removes context, `noContextReason` and `contextExcludedResults[].reason` are `NotAnswerable`.
-Enums are serialized by name, not numeric value.
+Agent Chat distinguishes selected grounding evidence from validated source citations. Citation validation checks source identity; it does not establish that a source supports every sentence. Remote reranking sends the query and candidate chunk text to the configured provider; review the [operational and security criteria](src/Runiq.AI.Agents/README.md#performance-and-operational-acceptance-criteria) before enabling it.
 
-See the [Agents reranking guide](src/Runiq.AI.Agents/README.md#answerability-acceptance-criteria) and
-[RAG provider contract](src/Runiq.AI.Rag/README.md#optional-reranking-contract) for detailed failure, timeout,
-cost, provider-neutral rules, and the
-[performance and operational release criteria](src/Runiq.AI.Agents/README.md#performance-and-operational-acceptance-criteria).
+## Samples
 
-## Tool Example
+| Sample | Demonstrates |
+| --- | --- |
+| [Expense assistant](samples/Runiq.AI.Expense/README.md) | Application agents and tools in an expense scenario |
+| [Product support assistant](samples/Runiq.AI.Rag.ProductSupportAssistant/README.md) | Document ingestion and RAG-powered support |
+| [Travel planner](samples/Runiq.AI.WorkflowTravelPlanner/README.md) | Agent workflow orchestration |
+| [User-based dashboard security](samples/Runiq.AI.DashboardSecurityUser/README.md) | Dashboard access with user authentication |
+| [Role-based dashboard security](samples/Runiq.AI.DashboardSecurityRole/README.md) | Dashboard access with role-based authorization |
 
-Tools are plain C# types with strongly typed input and output:
+Each sample guide describes its configuration and run commands.
 
-```csharp
-using Runiq.AI.Agents.Tools;
+## Build and test
 
-[RuniqTool("get_weather", "Gets the current weather for a city.")]
-public sealed class WeatherTool : IRuniqTool<WeatherInput, WeatherOutput>
-{
-    public Task<WeatherOutput> ExecuteAsync(
-        WeatherInput input,
-        CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult(new WeatherOutput(input.City, "Clear"));
-    }
-}
+Run these commands from the repository root. PostgreSQL integration tests require Docker with Compose and use the local pgvector service on port `54329`.
 
-public sealed record WeatherInput(string City);
-
-public sealed record WeatherOutput(string City, string Condition);
+```powershell
+docker compose -f docker-compose.rag-postgresql.yml up -d --wait
+dotnet restore Runiq.AI.slnx
+dotnet build Runiq.AI.slnx --no-restore -c Release
+dotnet test Runiq.AI.slnx --no-build -c Release --logger trx --results-directory TestResults
 ```
 
-Attach the tool to an agent:
+When finished with the database:
 
-```csharp
-options.AddAgent(new Agent(
-        id: "weather-agent",
-        name: "Weather Agent",
-        instructions: "Use tools when weather data is requested.",
-        model: "openai/gpt-5",
-        apiKey: builder.Configuration["OpenAI:ApiKey"])
-    .AddTool<WeatherTool>());
+```powershell
+docker compose -f docker-compose.rag-postgresql.yml stop
 ```
 
-## Documentation
+The dashboard frontend has separate build and test commands in its [development guide](src/Runiq.Dashboard.Client/README.md).
 
-Full documentation, guides, and examples are available at [runiq.net/docs](https://runiq.net/docs).
+### CI and test reporting
 
-## Repository
+The **CI** badge reports the `main` branch workflow status. The **.NET tests** badge reports executed, passed, failed, and skipped counts from the latest published `main` run's TRX reports. Skipped tests are excluded from the executed count. Counts are generated by CI, never maintained manually, and exclude the dashboard JavaScript suite.
 
-Source code and issue tracking are available on [GitHub](https://github.com/runiq-net/Runiq.AI).
+Click either badge to open GitHub Actions. Each run includes a **.NET test results** summary and a **test-results** artifact containing the available TRX reports and badge JSON, including when tests fail. Pull requests produce their own summaries and artifacts; only `main` push runs update the README badge. The initial badge reads **awaiting CI results** until CI publishes its first report.
+
+Badge publication requires the workflow token to have repository write access and branch rules to allow the existing bot update. If publication is blocked, the run summary and artifact still contain the results; consult the workflow status for the current run. Shields may briefly cache an older badge.
+
+To verify the reporting script locally with synthetic TRX cases:
+
+```powershell
+pwsh -File scripts/test-update-test-badge.ps1
+```
+
+### Create local NuGet packages
+
+After a successful Release build and test run:
+
+```powershell
+dotnet pack Runiq.AI.slnx --no-build -c Release -o artifacts/packages/1.0.0
+```
+
+Package versions are defined in the project files and currently use `1.0.0`. This command creates local packages only. Packaging may report `NU5104` because `Runiq.AI.Rag` references the prerelease dependency `UglyToad.PdfPig` version `1.7.0-custom-5`.
+
+## Repository layout
+
+| Path | Contents |
+| --- | --- |
+| `src/Runiq.AI.*` | .NET runtime packages and CLI |
+| `src/Runiq.Dashboard.Client` | Dashboard frontend |
+| `samples/` | Example applications |
+| `tests/` | .NET test projects |
+| `scripts/` | Repository automation and test badge reporting |
+| `.github/workflows/` | Build, test, and package CI |
+
+## Contributing and support
+
+Read the [contribution guide](CONTRIBUTING.md) for local setup and contribution conventions. Use [GitHub Issues](https://github.com/runiq-net/Runiq.AI/issues) for reproducible bugs and feature requests, and [runiq.net/docs](https://runiq.net/docs) for documentation.
 
 ## License
 

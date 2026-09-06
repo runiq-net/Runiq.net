@@ -18,6 +18,10 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>ProductSupportDocuments\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
     </None>
+    <None Update="SampleDocuments\corporate\*.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>ProductSupportDocuments\corporate\%(Filename)%(Extension)</TargetPath>
+    </None>
   </ItemGroup>
 
 </Project>
