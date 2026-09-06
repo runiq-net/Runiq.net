@@ -6,6 +6,8 @@
 [![.NET tests](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fruniq-net%2FRuniq.AI%2Fmain%2Fbadges%2Ftests.json)](https://github.com/runiq-net/Runiq.AI/actions/workflows/ci.yml?query=branch%3Amain)
 [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/download/dotnet/10.0)
 [![NuGet](https://img.shields.io/nuget/v/Runiq.AI.Agents?label=NuGet)](https://www.nuget.org/packages/Runiq.AI.Agents)
+[![NuGet downloads for Runiq.AI.Agents](https://img.shields.io/nuget/dt/Runiq.AI.Agents?label=downloads)](https://www.nuget.org/packages/Runiq.AI.Agents)
+[![Documentation](https://img.shields.io/badge/docs-runiq.net-blue)](https://runiq.net/docs)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 Runiq AI is a code-first agent runtime for .NET. Define agents and strongly typed tools, stream model responses, ground answers in your documents, and orchestrate workflows using your application's hosting and dependency injection. An embedded dashboard lets you explore agents, try conversations, and inspect runtime activity.
